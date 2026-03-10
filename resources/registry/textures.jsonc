@@ -1,0 +1,17 @@
+{
+    "name":         "Default",
+    "description":  "The default Sentinel textures",
+    "data": {
+        // Tiles //
+        "td:dirt": "$texture_dir$/tiles/dirt.png",
+        "td:dry_dirt": "$texture_dir$/tiles/dry_dirt.png",
+        "td:stone": "$texture_dir$/tiles/stone.png",
+        // Tops //
+        "td:top_grass": "$texture_dir$/tiles/tops/grass.png",
+        "td:top_grass_plane": "$texture_dir$/tiles/tops/grass_plane.png",
+        "td:top_forest": "$texture_dir$/tiles/tops/forest.png",
+        "td:top_dry_grass": "$texture_dir$/tiles/tops/dry_grass.png",
+        "td:top_scorched_earth": "$texture_dir$/tiles/tops/scorched_earth.png",
+        "td:top_snow": "$texture_dir$/tiles/tops/snow.png"
+    }
+}

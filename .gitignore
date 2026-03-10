@@ -1,0 +1,16 @@
+# Builds
+bin/*
+build/*
+
+# Packaging
+total_domination-linux
+total_domination-windows
+total_domination-linux.tar.gz
+total_domination-windows.zip
+
+# Logs
+data/logs/crashes/*
+data/logs/current.log
+
+# dev
+.development

@@ -1,0 +1,8 @@
+TODO: Load maps
+TODO: Display maps
+TODO: Camera movement
+
+TODO: Add SDL_GPU renderring
+TODO: Add software renderring
+
+FIXME: sometimes super long loading times when using SDL_GPU
