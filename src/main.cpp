@@ -47,12 +47,10 @@ SDL_AppResult SDL_AppIterate(void* appState) {
 
         bake_atlas(MAIN_RENDER_AGENT, "terrain_atlas", texture_names, (sizeof(texture_names) / sizeof(texture_names[0])));
 
-        LOG(LogLevel::DEBUG, "What is the Problem?");
         MAIN_RENDER_AGENT->add_sprite("terrain_atlas", "terrain_atlas", NULL, NULL, NULL, NULL);
         MAIN_RENDER_AGENT->add_entity("terrain_entity", "terrain_atlas", 0, 0, 4);
         MAIN_RENDER_AGENT->add_entity("tile1", "td:dirt", (int)SCREEN_WIDTH/10, (int)SCREEN_HEIGHT/10, 4);
         MAIN_RENDER_AGENT->add_entity("tile2", "td:stone", (int)SCREEN_WIDTH/10+16, (int)SCREEN_HEIGHT/10+11, 4);
-        LOG(LogLevel::DEBUG, "Hewwo?");
         MODE = 1;
 
     } else if (MODE == 1) {
@@ -195,9 +193,9 @@ SDL_AppResult SDL_AppInit(void** appState, int argc, char** argv) {
     MAIN_RENDER_AGENT = new RenderAgent();
 
     // Test.png //
-    LOG(LogLevel::DEBUG, "Loading Test.png...");
-    MAIN_RENDER_AGENT->add_texture("test_texture", LOCATIONS["texture_dir"].get_str()+"/Test.png");
-    MAIN_RENDER_AGENT->add_sprite("test_sprite", "test_texture", 0, 0, 32, 32);
+    //LOG(LogLevel::DEBUG, "Loading Test.png...");
+    //MAIN_RENDER_AGENT->add_texture("test_texture", LOCATIONS["texture_dir"].get_str()+"/Test.png");
+    //MAIN_RENDER_AGENT->add_sprite("test_sprite", "test_texture", 0, 0, 32, 32);
     //MAIN_RENDER_AGENT->add_entity("test_entity", "test_sprite", 0, 0, 4);
 
     std::string icon_path = std::string(LOCATIONS["resource_dir"]) + "/icons/icon.png";

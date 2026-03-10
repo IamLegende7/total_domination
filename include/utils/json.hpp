@@ -58,7 +58,7 @@ rapidjson::Document open_json(const std::string& filename) { // TODO: Add more d
         rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
         document.Accept(writer);
 
-        LOG(LogLevel::DEBUG, "Loaded Json %s:", filename.c_str());
+        if (DEBUG["all_debug_logs"]) LOG(LogLevel::DEBUG, "Loaded Json %s:", filename.c_str());
         std::cout << buffer.GetString() << std::endl;
     }
 

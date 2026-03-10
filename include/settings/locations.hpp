@@ -39,6 +39,7 @@ inline void init_locations_settings(std::string config_file) {
     LOCATIONS["missing_texture"] =      Setting(replace_locations(load_setting<std::string>(config_file, "Textures", "missing_texture_tile")));
     LOCATIONS["textures_json"] =        Setting(replace_locations(load_setting<std::string>(config_file, "Textures", "textures_json")));
     // Logging //
+    LOCATIONS["log_dir"] =              Setting(replace_locations(load_setting<std::string>(config_file, "Logging", "log_dir")));
     LOCATIONS["log_file"] =             Setting(replace_locations(load_setting<std::string>(config_file, "Logging", "log_file")));
     LOCATIONS["log_crash_dir"] =        Setting(replace_locations(load_setting<std::string>(config_file, "Logging", "log_crash_dir")));
     // Registry //

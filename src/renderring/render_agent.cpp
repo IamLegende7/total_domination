@@ -268,7 +268,7 @@ bool RenderAgent::add_sprite(const std::string& id, const std::string& texture_i
 
     SDL_FRect srcrect = {static_cast<float>(sprite_x), static_cast<float>(sprite_y), static_cast<float>(sprite_width), static_cast<float>(sprite_height)};
     agent_sprites[id] = RenderAgentSprite(texture_id, srcrect);
-    if (DEBUG["all_debug_logs"]) LOG(LogLevel::DEBUG, "Added new Sprite: srcrect: %f, %f, %f, %f", agent_sprites[id].texture_rect.x, agent_sprites[id].texture_rect.y, agent_sprites[id].texture_rect.w, agent_sprites[id].texture_rect.h);
+    if (DEBUG["all_debug_logs"]) LOG(LogLevel::DEBUG, "Added new Sprite %s: srcrect: %f, %f, %f, %f", id.c_str(), agent_sprites[id].texture_rect.x, agent_sprites[id].texture_rect.y, agent_sprites[id].texture_rect.w, agent_sprites[id].texture_rect.h);
     return true;
 };
 
