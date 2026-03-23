@@ -16,7 +16,7 @@
 #include "utils/logger.hpp"
 #include "settings/debug.hpp"
 
-std::string open_file(const std::string& filename) {
+inline std::string open_file(const std::string& filename) {
     std::ifstream file(filename);
     std::stringstream buffer;
 
@@ -30,7 +30,7 @@ std::string open_file(const std::string& filename) {
     return buffer.str();
 }
 
-rapidjson::Document open_json(const std::string& filename) { // TODO: Add more debug!
+inline rapidjson::Document open_json(const std::string& filename) { // TODO: Add more debug!
     rapidjson::Document document;
     try {
         std::string json_contents = open_file(filename);

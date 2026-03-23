@@ -1,7 +1,10 @@
 {
     "name":         "Default",
-    "description":  "The default Sentinel textures",
+    "description":  "The default TD textures",
     "data": {
+        // INTERNAL //
+        "td:missing": "$texture_dir$/missing.png",
+        "td:test": "$texture_dir$/test.png",
         // Tiles //
         "td:dirt": "$texture_dir$/tiles/dirt.png",
         "td:dry_dirt": "$texture_dir$/tiles/dry_dirt.png",

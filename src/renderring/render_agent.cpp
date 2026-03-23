@@ -256,15 +256,26 @@ bool RenderAgent::insert_texture(const std::string& id, RenderAgentTexture textu
     return true;
 }
 
+bool RenderAgent::texture_exists(const std::string& id) {
+    return agent_textures.find(id) != agent_textures.end();
+}
+
+RenderAgentTexture RenderAgent::get_texture(const std::string& id) {
+    if (texture_exists(id)) {
+        return agent_textures[id];
+    }
+    return RenderAgentTexture();
+}
+
 bool RenderAgent::add_texture(const std::string& id, const std::string& texture_path) {
     return insert_texture(id, load_texture(id, texture_path));
 };
 
 bool RenderAgent::add_sprite(const std::string& id, const std::string& texture_id, const int& x, const int& y, const int& width, const int& height) {
-    int sprite_x = (x == NULL) ? 0 : x;
-    int sprite_y = (y == NULL) ? 0 : y;
-    int sprite_width = (width == NULL) ? agent_textures[texture_id].width : width;
-    int sprite_height = (height == NULL) ? agent_textures[texture_id].height: height;
+    int sprite_x = x;
+    int sprite_y = y;
+    int sprite_width = (width < 0) ? agent_textures[texture_id].width : width;
+    int sprite_height = (height < 0) ? agent_textures[texture_id].height: height;
 
     SDL_FRect srcrect = {static_cast<float>(sprite_x), static_cast<float>(sprite_y), static_cast<float>(sprite_width), static_cast<float>(sprite_height)};
     agent_sprites[id] = RenderAgentSprite(texture_id, srcrect);
@@ -273,7 +284,8 @@ bool RenderAgent::add_sprite(const std::string& id, const std::string& texture_i
 };
 
 bool RenderAgent::add_entity(const std::string& id, const std::string& sprite_id, const int& x, const int& y, const int& size, const int& rotation) {
-    agent_entitys.push_back(RenderAgentEntity(sprite_id, x, y, size, rotation));
+    agent_entitys.push_back(RenderAgentEntity(id, sprite_id, x, y, size, rotation));
+    if (DEBUG["all_debug_logs"]) LOG(LogLevel::DEBUG, "Added new Entity %s: X: %d, Y: %d, Size: %d, Rotation: %d", id.c_str(), x, y, size, rotation);
     return true;
 };
 
@@ -286,7 +298,7 @@ void RenderAgent::render(bool clear_renderer) {
         }
 
         for (const RenderAgentEntity& entity : agent_entitys) {
-            if (DEBUG["all_debug_logs"]) LOG(LogLevel::DEBUG, "Renderring Entity %s at %d;%d", entity.name.c_str(), entity.x, entity.y);
+            if (DEBUG["all_debug_logs"]) LOG(LogLevel::DEBUG, "Renderring Entity %s at %d;%d", entity.name.c_str(), (entity.x-CAMERA.x)*CAMERA.zoom, (entity.y-CAMERA.y)*CAMERA.zoom);
             // Sprite
             if (!(agent_sprites.find(entity.sprite) != agent_sprites.end())) {
                 LOG(LogLevel::WARNING, "Sprite '%s' not found", entity.sprite.c_str());
@@ -297,7 +309,7 @@ void RenderAgent::render(bool clear_renderer) {
                 LOG(LogLevel::WARNING, "Texture '%s' not found", sprite.texture.c_str());
             }
             SDL_Texture* texture = agent_textures[sprite.texture].get_texture();
-            SDL_FRect dstrect = {(float)(entity.x*entity.size), (float)(entity.y*entity.size), (sprite.texture_rect.w*entity.size), (sprite.texture_rect.h*entity.size)};
+            SDL_FRect dstrect = {(float)((entity.x-CAMERA.x)*CAMERA.zoom), (float)((entity.y-CAMERA.y)*CAMERA.zoom), (sprite.texture_rect.w*CAMERA.zoom), (sprite.texture_rect.h*CAMERA.zoom)};
             SDL_RenderTexture(RENDERER, texture, &sprite.texture_rect, &dstrect);
         }
 
@@ -341,12 +353,13 @@ void RenderAgent::render(bool clear_renderer) {
     }
 }
 
-RenderAgentTexture RenderAgent::bake_texture_from_file(TextureConstructor* texture_constructors[], const int array_size) {
+RenderAgentTexture RenderAgent::bake_texture(TextureConstructor* texture_constructors[], const int array_size, const bool force_file_loading) {
     int surface_width = 0;
     int surface_height = 0;
     for (int i = 0; i < array_size; ++i) {
         TextureConstructor* constructor = texture_constructors[i];
-        constructor->texture = new RenderAgentTexture(load_texture(constructor->file, constructor->file));
+        if (texture_exists(constructor->name) & !force_file_loading) constructor->texture = &(agent_textures[constructor->name]);
+        else                                                         constructor->texture = new RenderAgentTexture(load_texture(constructor->file, constructor->file));
         surface_width = std::max(surface_width, (constructor->texture->width+constructor->x)*constructor->size);
         surface_height = std::max(surface_height, (constructor->texture->height+constructor->y)*constructor->size);
     }
@@ -363,4 +376,29 @@ RenderAgentTexture RenderAgent::bake_texture_from_file(TextureConstructor* textu
         SDL_SetRenderTarget(RENDERER, nullptr);
         return RenderAgentTexture(bake_texture, surface_width, surface_height);
     }
+    return RenderAgentTexture();
+}
+
+void RenderAgent::drop_texture(const std::string& id) {
+    agent_textures.erase(id.c_str());
+}
+
+RenderAgentEntity RenderAgent::get_entity(const std::string& id) {
+    for (auto& entity : agent_entitys) {
+        if (entity.name == id) {
+            //LOG(LogLevel::DEBUG, "Found entity %s!", id.c_str());
+            return entity;
+        }
+    }
+    return RenderAgentEntity();
+}
+
+bool RenderAgent::update_entity(RenderAgentEntity update_entity) {
+    for (auto& entity : agent_entitys) {
+        if (entity.name == update_entity.name) {
+            entity = update_entity;
+            return true;
+        }
+    }
+    return false;
 }

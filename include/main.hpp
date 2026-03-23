@@ -20,4 +20,13 @@ inline int MODE = 0;
 inline int SCREEN_WIDTH = 640;
 inline int SCREEN_HEIGHT = 480;
 
+struct Camera {
+    int x, y;
+    int zoom;
+    Camera(): x(0), y(0), zoom(4) {};
+    Camera(int x, int y, int zoom): x(x), y(y), zoom(zoom) {};
+};
+
+inline Camera CAMERA = Camera(-100, -100, 1);
+
 #endif

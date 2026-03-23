@@ -3,9 +3,11 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL_gpu.h>
+#include <SDL3/SDL_messagebox.h>
 #include <SDL3_image/SDL_image.h>
 
 #include "main.hpp"
+#include "map.hpp"
 #include "renderring/render_agents.hpp"
 #include "renderring/textures.hpp"
 #include "utils/logger.hpp"
@@ -32,25 +34,9 @@ SDL_AppResult SDL_AppIterate(void* appState) {
     accumulator += elapsed;
 
     if (MODE == 0) {
-        //TextureConstructor* terrain_tiles[2];
-        //    terrain_tiles[0] = new TextureConstructor(LOCATIONS["texture_dir"].get_str()+"/tiles/dirt.png", 0, 0);
-        //    terrain_tiles[1] = new TextureConstructor(LOCATIONS["texture_dir"].get_str()+"/tiles/stone.png", 32, 0);
-        //MAIN_RENDER_AGENT->insert_texture("terrain_atlas", MAIN_RENDER_AGENT->bake_texture_from_file(terrain_tiles, (sizeof(terrain_tiles) / sizeof(terrain_tiles[0]))));
-        //MAIN_RENDER_AGENT->add_sprite("dirt", "terrain_atlas", 0, 0, 32, 37);
-        //MAIN_RENDER_AGENT->add_sprite("stone", "terrain_atlas", 32, 0, 32, 37);
+        MAIN_MAP = new Map(MAIN_RENDER_AGENT, "$map_dir$/testing/test1.jsonc");
+        CAMERA.zoom = SETTINGS["initial_camera_zoom"];
 
-        std::string texture_names[3] = {
-            "td:dirt",
-            "td:stone",
-            "td:dry_dirt"
-        };
-
-        bake_atlas(MAIN_RENDER_AGENT, "terrain_atlas", texture_names, (sizeof(texture_names) / sizeof(texture_names[0])));
-
-        MAIN_RENDER_AGENT->add_sprite("terrain_atlas", "terrain_atlas", NULL, NULL, NULL, NULL);
-        MAIN_RENDER_AGENT->add_entity("terrain_entity", "terrain_atlas", 0, 0, 4);
-        MAIN_RENDER_AGENT->add_entity("tile1", "td:dirt", (int)SCREEN_WIDTH/10, (int)SCREEN_HEIGHT/10, 4);
-        MAIN_RENDER_AGENT->add_entity("tile2", "td:stone", (int)SCREEN_WIDTH/10+16, (int)SCREEN_HEIGHT/10+11, 4);
         MODE = 1;
 
     } else if (MODE == 1) {
@@ -83,7 +69,19 @@ SDL_AppResult SDL_AppEvent(void* appState, SDL_Event* event) {
         SCREEN_WIDTH = event->window.data1;
         SCREEN_HEIGHT = event->window.data2;
         if (int(RENDER_SETTINGS["render_mode"]) == 1) SDL_SetRenderViewport(RENDERER, NULL);
-        //DIRTY_SCREEN = true;
+        DIRTY_SCREEN = true;
+        RenderAgentEntity entity_tile_1 = MAIN_RENDER_AGENT->get_entity("tile1");
+        if (!(entity_tile_1.name == "missing")) {
+            entity_tile_1.x = SCREEN_WIDTH/10;
+            entity_tile_1.y = SCREEN_HEIGHT/10;
+            MAIN_RENDER_AGENT->update_entity(entity_tile_1);
+        }
+        RenderAgentEntity entity_tile_2 = MAIN_RENDER_AGENT->get_entity("tile2");
+        if (!(entity_tile_2.name == "missing")) {
+            entity_tile_2.x = SCREEN_WIDTH/10+16;
+            entity_tile_2.y = SCREEN_HEIGHT/10+11;
+            MAIN_RENDER_AGENT->update_entity(entity_tile_2);
+        }
     }
 
     return SDL_APP_CONTINUE;
@@ -193,8 +191,8 @@ SDL_AppResult SDL_AppInit(void** appState, int argc, char** argv) {
     MAIN_RENDER_AGENT = new RenderAgent();
 
     // Test.png //
-    //LOG(LogLevel::DEBUG, "Loading Test.png...");
-    //MAIN_RENDER_AGENT->add_texture("test_texture", LOCATIONS["texture_dir"].get_str()+"/Test.png");
+    //LOG(LogLevel::DEBUG, "Loading test.png...");
+    //MAIN_RENDER_AGENT->add_texture("test_texture", LOCATIONS["texture_dir"].get_str()+"/test.png");
     //MAIN_RENDER_AGENT->add_sprite("test_sprite", "test_texture", 0, 0, 32, 32);
     //MAIN_RENDER_AGENT->add_entity("test_entity", "test_sprite", 0, 0, 4);
 
@@ -261,8 +259,12 @@ std::string crash_handler() {
 void SDL_AppQuit(void *appstate, SDL_AppResult result) {
     if (result == SDL_APP_FAILURE) {
         std::string crash_log_file = crash_handler();
-        LOG(LogLevel::CRITICAL, "It seems this application has crashed! See %s for more details", crash_log_file.c_str());
+        const std::string crash_message = "It seems this application has crashed! See \""+crash_log_file+"\" for more details";
+        LOG(LogLevel::CRITICAL, "%s", crash_message.c_str());
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "TD Chrash-Handler", crash_message.c_str(), NULL);
     }
+
+    delete MAIN_MAP;
 
     delete MAIN_RENDER_AGENT;
     LOG(LogLevel::INFO, "Cleaning up");

@@ -85,21 +85,22 @@ struct RenderAgentEntity {
     int rotation;
 
     RenderAgentEntity()
-        : sprite("td:missing"), x(-100), y(-100), size(10), rotation(0) {};
-    RenderAgentEntity(std::string sprite, int x, int y, int size, int rotation=0)
-        : sprite(sprite), x(x), y(y), size(size), rotation(rotation) {};
+        : name("missing"), sprite("td:missing"), x(-100), y(-100), size(10), rotation(0) {};
+    RenderAgentEntity(std::string name, std::string sprite, int x, int y, int size, int rotation=0)
+        : name(name), sprite(sprite), x(x), y(y), size(size), rotation(rotation) {};
 };
 
 struct TextureConstructor {
+    std::string name;
     std::string file;
     int x, y;
     int size;
     RenderAgentTexture* texture;
 
     TextureConstructor()
-        : file(LOCATIONS["missing_texture_tile"]), x(0), y(0), size(10) {};
-    TextureConstructor(std::string file, int x, int y, int size=1)
-        : file(file), x(x), y(y), size(size) {};
+        : name("td:missing"), file(LOCATIONS["missing_texture_tile"]), x(0), y(0), size(10) {};
+    TextureConstructor(std::string name, std::string file, int x, int y, int size=1)
+        : name(name), file(file), x(x), y(y), size(size) {};
 };
 
 class RenderAgent {
@@ -115,14 +116,24 @@ class RenderAgent {
     public:
         RenderAgent(SDL_Window* window = WINDOW);
         //~RenderAgent();
+
+        // Textures
+        bool add_texture(const std::string& id, const std::string& texture_path);
         RenderAgentTexture load_texture(const std::string& id, const std::string& texture_path);
         bool insert_texture(const std::string& id, RenderAgentTexture texture);
-        bool add_texture(const std::string& id, const std::string& texture_path);
-        bool add_sprite(const std::string& id, const std::string& texture_id, const int& x, const int& y, const int& width, const int& height);
-        bool add_entity(const std::string& id, const std::string& sprite_id, const int& x, const int& y, const int& size, const int& rotation=0);
-        //void drop_texture(std::string& id);
+        bool texture_exists(const std::string& id);
+        RenderAgentTexture get_texture(const std::string& id);
+        void drop_texture(const std::string& id);
+
+        // Sprites
+        bool add_sprite(const std::string& id, const std::string& texture_id, const int& x, const int& y, const int& width=-1, const int& height=-1);
         void render(bool clear_renderer=true);
-        RenderAgentTexture bake_texture_from_file(TextureConstructor* texture_constructors[], const int array_size);
+        RenderAgentTexture bake_texture(TextureConstructor* texture_constructors[], const int array_size, const bool force_file_loading=false);
+
+        // Entitys
+        bool add_entity(const std::string& id, const std::string& sprite_id, const int& x, const int& y, const int& size, const int& rotation=0);
+        bool update_entity(RenderAgentEntity update_entity);
+        RenderAgentEntity get_entity(const std::string& id);
 };
 
 #endif

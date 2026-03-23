@@ -24,7 +24,7 @@ std::string get_texture(const std::string& name) {
         LOG(LogLevel::WARNING, "Could not get texture of %s: %s does not contain value '%s'", name.c_str(), LOCATIONS["textures_json"].get_c_str(), name.c_str());
         return LOCATIONS["missing_texture"];
     }
-    //if (!textures_json["data"][name.c_str()].IsString()) {
+    //if (!textures_json["data"][name.c_str()].IsString()) { // Results in core dump
     //    LOG(LogLevel::WARNING, "Could not get texture of %s: %s is not a object", name.c_str(), name.c_str());
     //    return LOCATIONS["missing_texture"];
     //}
@@ -37,7 +37,7 @@ bool add_texture(RenderAgent* agent, const std::string& texture_name) {
     return agent->add_texture(texture_name, texture_path);
 }
 
-bool bake_atlas(RenderAgent* agent, const std::string& atlas_name, const std::string* texture_names, const int& texture_names_length) {
+bool bake_atlas(RenderAgent* agent, const std::string& atlas_name, const std::string* texture_names, const int& texture_names_length, const bool force_file_loading) {
     TextureConstructor* constructors[texture_names_length];
     int atlas_size = RENDER_SETTINGS["texture_atlas_size"];
     if (DEBUG["all_debug_logs"]) LOG(LogLevel::DEBUG, "Atlas size is %dx%d", atlas_size, atlas_size);
@@ -48,9 +48,11 @@ bool bake_atlas(RenderAgent* agent, const std::string& atlas_name, const std::st
     for (int i = 0; i < texture_names_length; ++i) {
         std::string current_texture_name = texture_names[i];
         std::string current_texture_path = get_texture(current_texture_name);
-        constructors[i] = new TextureConstructor(current_texture_path, 0, 0, 1);
+        constructors[i] = new TextureConstructor(current_texture_name, current_texture_path, 0, 0, 1);
         if (DEBUG["all_debug_logs"]) LOG(LogLevel::DEBUG, "current_texture_path: %s", current_texture_path.c_str());
-        RenderAgentTexture current_texture = agent->load_texture(current_texture_name, current_texture_path);
+        RenderAgentTexture current_texture;
+        if (agent->texture_exists(current_texture_name) & !force_file_loading) current_texture = agent->get_texture(current_texture_name);
+        else                                                                   current_texture = agent->load_texture(current_texture_name, current_texture_path);
 
         found_pos = false;
         int current_row = 0;
@@ -95,7 +97,7 @@ bool bake_atlas(RenderAgent* agent, const std::string& atlas_name, const std::st
             }
         }
     }
-    RenderAgentTexture atlas_texture = agent->bake_texture_from_file(constructors, texture_names_length);
+    RenderAgentTexture atlas_texture = agent->bake_texture(constructors, texture_names_length);
     agent->insert_texture(atlas_name, atlas_texture);
     if (DEBUG["save_texture_atlases"]) {
         if (RENDER_SETTINGS["render_mode"] == 1) {
