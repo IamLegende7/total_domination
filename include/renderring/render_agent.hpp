@@ -111,7 +111,7 @@ class RenderAgent {
         SDL_GPUGraphicsPipeline *pipeline = NULL;
         SDL_GPUSampler* sampler = NULL;
         //SDL_GPUTransferBuffer* sprite_data_transfer_buffer = NULL;
-        //SDL_GPUBuffer+ sprite_data_buffer = NULL;
+        //SDL_GPUBuffer* sprite_data_buffer = NULL;
         
     public:
         RenderAgent(SDL_Window* window = WINDOW);

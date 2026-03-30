@@ -6,7 +6,7 @@
 #include "settings/locations.hpp"
 #include "utils/logger.hpp"
 
-std::string get_texture(const std::string& name) {
+std::string get_texture_path(const std::string& name) {
     rapidjson::Document textures_json = open_json(LOCATIONS["textures_json"]);
     if (!textures_json.IsObject()) { // <-- Seg fault here
         LOG(LogLevel::WARNING, "%s is not a valid textures.json file: root is not an object!", LOCATIONS["textures_json"].get_c_str());
@@ -33,7 +33,7 @@ std::string get_texture(const std::string& name) {
 };
 
 bool add_texture(RenderAgent* agent, const std::string& texture_name) {
-    std::string texture_path = get_texture(texture_name);
+    std::string texture_path = get_texture_path(texture_name);
     return agent->add_texture(texture_name, texture_path);
 }
 
@@ -47,7 +47,7 @@ bool bake_atlas(RenderAgent* agent, const std::string& atlas_name, const std::st
     bool found_pos;
     for (int i = 0; i < texture_names_length; ++i) {
         std::string current_texture_name = texture_names[i];
-        std::string current_texture_path = get_texture(current_texture_name);
+        std::string current_texture_path = (agent->texture_exists(current_texture_name) & !force_file_loading) ? "" : get_texture_path(current_texture_name);
         constructors[i] = new TextureConstructor(current_texture_name, current_texture_path, 0, 0, 1);
         if (DEBUG["all_debug_logs"]) LOG(LogLevel::DEBUG, "current_texture_path: %s", current_texture_path.c_str());
         RenderAgentTexture current_texture;

@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -90,7 +90,7 @@ void SDL_Blit_Slow(SDL_BlitInfo *info)
     posy = incy / 2; // start at the middle of pixel
 
     while (info->dst_h--) {
-        Uint8 *src = 0;
+        Uint8 *src = NULL;
         Uint8 *dst = info->dst;
         int n = info->dst_w;
         posx = incx / 2; // start at the middle of pixel
@@ -897,7 +897,7 @@ void SDL_Blit_Slow_Float(SDL_BlitInfo *info)
     posy = incy / 2; // start at the middle of pixel
 
     while (info->dst_h--) {
-        Uint8 *src = 0;
+        Uint8 *src = NULL;
         Uint8 *dst = info->dst;
         int n = info->dst_w;
         posx = incx / 2; // start at the middle of pixel

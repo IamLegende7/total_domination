@@ -1,6 +1,6 @@
 /*
   SDL_image:  An example image loading library for use with SDL
-  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -198,8 +198,7 @@ static int color_to_argb(char *spec, int speclen, Uint32 *argb)
         { "red",                  0xffFF0000 },
         { "green",                0xff00FF00 },
         { "blue",                 0xff0000FF },
-/* This table increases the size of the library by 40K, so it's disabled by default */
-#ifdef EXTENDED_XPM_COLORS
+#ifndef DISABLE_EXTENDED_XPM_COLORS
         { "aliceblue",            0xfff0f8ff },
         { "antiquewhite",         0xfffaebd7 },
         { "antiquewhite1",        0xffffefdb },
@@ -877,7 +876,7 @@ static int color_to_argb(char *spec, int speclen, Uint32 *argb)
         { "yellow3",              0xffCDCD00 },
         { "yellow4",              0xff8B8B00 },
         { "yellowgreen",          0xff9acd32 },
-#endif /* EXTENDED_XPM_COLORS */
+#endif /* !DISABLE_EXTENDED_XPM_COLORS */
     };
 
     if (spec[0] == '#') {
@@ -1212,28 +1211,24 @@ SDL_Surface *IMG_ReadXPMFromArrayToRGB888(char **xpm)
 /* See if an image is contained in a data source */
 bool IMG_isXPM(SDL_IOStream *src)
 {
-    (void)src;
     return false;
 }
 
 /* Load a XPM type image from an SDL datasource */
 SDL_Surface *IMG_LoadXPM_IO(SDL_IOStream *src)
 {
-    (void)src;
     SDL_SetError("SDL_image built without XPM support");
     return NULL;
 }
 
 SDL_Surface *IMG_ReadXPMFromArray(char **xpm)
 {
-    (void)xpm;
     SDL_SetError("SDL_image built without XPM support");
     return NULL;
 }
 
 SDL_Surface *IMG_ReadXPMFromArrayToRGB888(char **xpm)
 {
-    (void)xpm;
     SDL_SetError("SDL_image built without XPM support");
     return NULL;
 }

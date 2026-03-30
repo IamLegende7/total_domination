@@ -30,10 +30,17 @@ set(SDLIMAGE_XPM   TRUE)
 set(SDLIMAGE_XV    TRUE)
 set(SDLIMAGE_WEBP  TRUE)
 
+set(SDLIMAGE_PNG_LIBPNG   TRUE)
+
+set(SDLIMAGE_AVIF_SHARED  TRUE)
+set(SDLIMAGE_JXL_SHARED   TRUE)
+set(SDLIMAGE_PNG_SHARED   TRUE)
+set(SDLIMAGE_WEBP_SHARED  TRUE)
+
 set(SDLIMAGE_JPG_SAVE TRUE)
 set(SDLIMAGE_PNG_SAVE TRUE)
 
-set(SDLIMAGE_VENDORED  FALSE)
+set(SDLIMAGE_VENDORED  TRUE)
 
 set(SDLIMAGE_BACKEND_IMAGEIO   TRUE)
 set(SDLIMAGE_BACKEND_STB       FALSE)
@@ -83,7 +90,6 @@ set(SDL3_image_SDL3_image-shared_FOUND TRUE)
 set(SDL3_image_SDL3_image-static FALSE)
 
 unset(_sdl3_image_framework_path)
-unset(_sdl3_image_framework_parent_path)
 
 if(SDL3_image_SDL3_image-shared_FOUND)
     set(SDL3_image_SDL3_image_FOUND TRUE)

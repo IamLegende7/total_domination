@@ -7,6 +7,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE OFF)
 set(RESOURCE_FILES
     palette.bmp
     palette.gif
+    rgbrgb.ani
     rgbrgb.avifs
     rgbrgb.gif
     rgbrgb.png
@@ -41,6 +42,9 @@ function(add_sdl_image_test_executable TARGET)
             $<TARGET_PROPERTY:${sdl3_image_target_name},COMPILE_DEFINITIONS>
     )
     sdl_add_warning_options(${TARGET} WARNING_AS_ERROR ${SDLIMAGE_WERROR})
+    if("c_std_99" IN_LIST CMAKE_C_COMPILE_FEATURES)
+        target_compile_features(${TARGET} PRIVATE c_std_99)
+    endif()
     target_link_libraries(${TARGET} PRIVATE SDL3_image::SDL3_image SDL3::SDL3_test SDL3::SDL3)
 
     if(SDLIMAGE_TESTS_INSTALL)

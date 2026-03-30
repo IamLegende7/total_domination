@@ -1,6 +1,6 @@
 /*
   SDL_image:  An example image loading library for use with SDL
-  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -49,6 +49,15 @@
 #ifdef WANT_JPEGLIB
 
 #define USE_JPEGLIB
+
+#if defined(LOAD_JPG_DYNAMIC) && defined(SDL_ELF_NOTE_DLOPEN)
+SDL_ELF_NOTE_DLOPEN(
+    "jpeg",
+    "Support for JPEG images using libjpg",
+    SDL_ELF_NOTE_DLOPEN_PRIORITY_SUGGESTED,
+    LOAD_JPG_DYNAMIC
+)
+#endif
 
 #include <jpeglib.h>
 
@@ -224,7 +233,6 @@ typedef struct {
 static void init_source (j_decompress_ptr cinfo)
 {
     /* We don't actually need to do anything */
-    (void)cinfo;
     return;
 }
 
@@ -289,7 +297,6 @@ static void skip_input_data (j_decompress_ptr cinfo, long num_bytes)
 static void term_source (j_decompress_ptr cinfo)
 {
     /* We don't actually need to do anything */
-    (void)cinfo;
     return;
 }
 
@@ -341,7 +348,6 @@ static void my_error_exit(j_common_ptr cinfo)
 static void output_no_message(j_common_ptr cinfo)
 {
     /* do nothing */
-    (void)cinfo;
 }
 
 struct loadjpeg_vars {
@@ -378,7 +384,7 @@ static bool LIBJPEG_LoadJPG_IO(SDL_IOStream *src, struct loadjpeg_vars *vars)
         lib.jpeg_calc_output_dimensions(&vars->cinfo);
 
         /* Allocate an output surface to hold the image */
-        vars->surface = SDL_CreateSurface(vars->cinfo.output_width, vars->cinfo.output_height, SDL_PIXELFORMAT_BGRA32);
+        vars->surface = SDL_CreateSurface(vars->cinfo.output_width, vars->cinfo.output_height, SDL_PIXELFORMAT_RGBA32);
     } else {
         /* Set 24-bit RGB output */
         vars->cinfo.out_color_space = JCS_RGB;
@@ -410,6 +416,17 @@ static bool LIBJPEG_LoadJPG_IO(SDL_IOStream *src, struct loadjpeg_vars *vars)
     lib.jpeg_finish_decompress(&vars->cinfo);
     lib.jpeg_destroy_decompress(&vars->cinfo);
 
+    if (vars->cinfo.num_components == 4) {
+        // The CMYK image is essentially RGBA composed over black
+        SDL_Surface *output = SDL_CreateSurface(vars->cinfo.output_width, vars->cinfo.output_height, SDL_PIXELFORMAT_RGB24);
+        if (!output) {
+            return false;
+        }
+
+        SDL_BlitSurface(vars->surface, NULL, output, NULL);
+        SDL_DestroySurface(vars->surface);
+        vars->surface = output;
+    }
     return true;
 }
 
@@ -457,7 +474,6 @@ typedef struct {
 static void init_destination(j_compress_ptr cinfo)
 {
     /* We don't actually need to do anything */
-    (void)cinfo;
     return;
 }
 
@@ -667,14 +683,12 @@ SDL_Surface *IMG_LoadJPG_IO(SDL_IOStream *src)
 /* See if an image is contained in a data source */
 bool IMG_isJPG(SDL_IOStream *src)
 {
-    (void)src;
     return false;
 }
 
 /* Load a JPEG type image from an SDL datasource */
 SDL_Surface *IMG_LoadJPG_IO(SDL_IOStream *src)
 {
-    (void)src;
     SDL_SetError("SDL_image built without JPG support");
     return NULL;
 }
@@ -763,8 +777,6 @@ static bool IMG_SaveJPG_IO_tinyjpeg(SDL_Surface *surface, SDL_IOStream *dst, int
 bool IMG_SaveJPG_IO(SDL_Surface *surface, SDL_IOStream *dst, bool closeio, int quality)
 {
     bool result = false;
-    (void)surface;
-    (void)quality;
 
     if (!surface) {
         SDL_InvalidParamError("surface");
@@ -808,18 +820,11 @@ bool IMG_SaveJPG(SDL_Surface *surface, const char *file, int quality)
 
 bool IMG_SaveJPG_IO(SDL_Surface *surface, SDL_IOStream *dst, bool closeio, int quality)
 {
-    (void)surface;
-    (void)dst;
-    (void)closeio;
-    (void)quality;
     return SDL_SetError("SDL_image built without JPG save support");
 }
 
 bool IMG_SaveJPG(SDL_Surface *surface, const char *file, int quality)
 {
-    (void)surface;
-    (void)file;
-    (void)quality;
     return SDL_SetError("SDL_image built without JPG save support");
 }
 

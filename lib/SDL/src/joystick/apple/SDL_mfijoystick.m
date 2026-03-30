@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -26,6 +26,10 @@
 #include "../hidapi/SDL_hidapijoystick_c.h"
 #include "../usb_ids.h"
 #include "../../events/SDL_events_c.h"
+
+#ifdef SDL_VIDEO_DRIVER_UIKIT
+#include "../../video/uikit/SDL_uikitvideo.h"
+#endif
 
 #include "SDL_mfijoystick_c.h"
 
@@ -155,6 +159,13 @@ static bool IsControllerSwitchJoyConPair(GCController *controller)
         if ([controller.productCategory isEqualToString:@"Nintendo Switch Joy-Con (L/R)"]) {
             return true;
         }
+    }
+    return false;
+}
+static bool IsControllerNVIDIASHIELD(GCController *controller)
+{
+    if ([controller.vendorName hasPrefix:@"NVIDIA Controller"]) {
+        return true;
     }
     return false;
 }
@@ -290,6 +301,21 @@ static bool IOS_AddMFIJoystickDevice(SDL_JoystickDeviceItem *device, GCControlle
     Uint8 subtype = 0;
     const char *name = NULL;
 
+    // Technically we only want to do this when the controller is opened, but we ALSO
+    // want to do this when the controller is opened via HIDAPI or IOKit, and we don't
+    // have an easy way to know if those devices correspond to a specific GCController.
+    //
+    // Since the fact that we're initializing means that the application is likely to
+    // be opening available controllers, this is probably the right thing to do for now.
+    if (@available(macOS 11.0, iOS 14.0, tvOS 14.0, *)) {
+        for (id key in controller.physicalInputProfile.buttons) {
+            GCControllerButtonInput *button = controller.physicalInputProfile.buttons[key];
+            if ([button isBoundToSystemGesture]) {
+                button.preferredSystemGestureState = GCSystemGestureStateDisabled;
+            }
+        }
+    }
+
     if (@available(macOS 11.3, iOS 14.5, tvOS 14.5, *)) {
         if (!GCController.shouldMonitorBackgroundEvents) {
             GCController.shouldMonitorBackgroundEvents = YES;
@@ -300,13 +326,13 @@ static bool IOS_AddMFIJoystickDevice(SDL_JoystickDeviceItem *device, GCControlle
      * struct, and ARC doesn't work with structs. */
     device->controller = (__bridge GCController *)CFBridgingRetain(controller);
 
-    if (@available(macOS 10.15, iOS 13.0, tvOS 13.0, *)) {
-        if (controller.productCategory) {
-            name = controller.productCategory.UTF8String;
-        }
+    if (controller.vendorName) {
+        name = controller.vendorName.UTF8String;
     } else {
-        if (controller.vendorName) {
-            name = controller.vendorName.UTF8String;
+        if (@available(macOS 10.15, iOS 13.0, tvOS 13.0, *)) {
+            if (controller.productCategory) {
+                name = controller.productCategory.UTF8String;
+            }
         }
     }
 
@@ -339,6 +365,7 @@ static bool IOS_AddMFIJoystickDevice(SDL_JoystickDeviceItem *device, GCControlle
     device->is_ps5 = IsControllerPS5(controller);
     device->is_switch_pro = IsControllerSwitchPro(controller);
     device->is_switch_joycon_pair = IsControllerSwitchJoyConPair(controller);
+    device->is_shield = IsControllerNVIDIASHIELD(controller);
     device->is_stadia = IsControllerStadia(controller);
     device->is_backbone_one = IsControllerBackboneOne(controller);
     device->is_switch_joyconL = IsControllerSwitchJoyConL(controller);
@@ -350,11 +377,18 @@ static bool IOS_AddMFIJoystickDevice(SDL_JoystickDeviceItem *device, GCControlle
         (device->is_ps5 && HIDAPI_IsDeviceTypePresent(SDL_GAMEPAD_TYPE_PS5)) ||
         (device->is_switch_pro && HIDAPI_IsDeviceTypePresent(SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_PRO)) ||
         (device->is_switch_joycon_pair && HIDAPI_IsDevicePresent(USB_VENDOR_NINTENDO, USB_PRODUCT_NINTENDO_SWITCH_JOYCON_PAIR, 0, "")) ||
+        (device->is_shield && HIDAPI_IsDevicePresent(USB_VENDOR_NVIDIA, USB_PRODUCT_NVIDIA_SHIELD_CONTROLLER_V104, 0, "")) ||
         (device->is_stadia && HIDAPI_IsDevicePresent(USB_VENDOR_GOOGLE, USB_PRODUCT_GOOGLE_STADIA_CONTROLLER, 0, "")) ||
         (device->is_switch_joyconL && HIDAPI_IsDevicePresent(USB_VENDOR_NINTENDO, USB_PRODUCT_NINTENDO_SWITCH_JOYCON_LEFT, 0, "")) ||
         (device->is_switch_joyconR && HIDAPI_IsDevicePresent(USB_VENDOR_NINTENDO, USB_PRODUCT_NINTENDO_SWITCH_JOYCON_RIGHT, 0, "")) ||
+        (SDL_strstr(name, "GameCube Controller Adapter") &&
+            (HIDAPI_IsDevicePresent(USB_VENDOR_NINTENDO, USB_PRODUCT_NINTENDO_GAMECUBE_ADAPTER, 0, "") ||
+             HIDAPI_IsDevicePresent(USB_VENDOR_DRAGONRISE, USB_PRODUCT_EVORETRO_GAMECUBE_ADAPTER1, 0, "") ||
+             HIDAPI_IsDevicePresent(USB_VENDOR_DRAGONRISE, USB_PRODUCT_EVORETRO_GAMECUBE_ADAPTER2, 0, "") ||
+             HIDAPI_IsDevicePresent(USB_VENDOR_DRAGONRISE, USB_PRODUCT_EVORETRO_GAMECUBE_ADAPTER3, 0, ""))) ||
         (SDL_strcmp(name, "8Bitdo SN30 Pro") == 0 && (HIDAPI_IsDevicePresent(USB_VENDOR_8BITDO, USB_PRODUCT_8BITDO_SN30_PRO, 0, "") || HIDAPI_IsDevicePresent(USB_VENDOR_8BITDO, USB_PRODUCT_8BITDO_SN30_PRO_BT, 0, ""))) ||
-        (SDL_strcmp(name, "8BitDo Pro 2") == 0 && (HIDAPI_IsDevicePresent(USB_VENDOR_8BITDO, USB_PRODUCT_8BITDO_PRO_2, 0, "") || HIDAPI_IsDevicePresent(USB_VENDOR_8BITDO, USB_PRODUCT_8BITDO_PRO_2_BT, 0, "")))) {
+        (SDL_strcmp(name, "8BitDo Pro 2") == 0 && (HIDAPI_IsDevicePresent(USB_VENDOR_8BITDO, USB_PRODUCT_8BITDO_PRO_2, 0, "") || HIDAPI_IsDevicePresent(USB_VENDOR_8BITDO, USB_PRODUCT_8BITDO_PRO_2_BT, 0, ""))) ||
+        (SDL_startswith(name, "8BitDo Ultimate 2 Wireless") && HIDAPI_IsDevicePresent(USB_VENDOR_8BITDO, USB_PRODUCT_8BITDO_ULTIMATE2_WIRELESS, 0, ""))) {
         // The HIDAPI driver is taking care of this device
         return false;
     }
@@ -488,7 +522,7 @@ static bool IOS_AddMFIJoystickDevice(SDL_JoystickDeviceItem *device, GCControlle
         subtype = 4;
 
 #ifdef DEBUG_CONTROLLER_PROFILE
-        NSLog(@"Elements used:\n", controller.vendorName);
+        NSLog(@"Elements used:\n");
         for (id key in device->buttons) {
             NSLog(@"\tButton: %@ (%s)\n", key, elements[key].analog ? "analog" : "digital");
         }
@@ -623,16 +657,11 @@ static void IOS_AddJoystickDevice(GCController *controller)
     device->pause_button_index = -1;
 
     if (controller) {
-#ifdef SDL_JOYSTICK_MFI
         if (!IOS_AddMFIJoystickDevice(device, controller)) {
             SDL_free(device->name);
             SDL_free(device);
             return;
         }
-#else
-        SDL_free(device);
-        return;
-#endif // SDL_JOYSTICK_MFI
     }
 
     if (deviceList == NULL) {
@@ -687,7 +716,10 @@ static SDL_JoystickDeviceItem *IOS_RemoveJoystickDevice(SDL_JoystickDeviceItem *
         // These were explicitly retained in the struct, so they should be explicitly released before freeing the struct.
         if (device->controller) {
             GCController *controller = CFBridgingRelease((__bridge CFTypeRef)(device->controller));
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
             controller.controllerPausedHandler = nil;
+#pragma clang diagnostic pop
             device->controller = nil;
         }
         if (device->axes) {
@@ -790,6 +822,10 @@ static bool IOS_JoystickInit(void)
                                                SDL_UnlockJoysticks();
                                              }];
 #endif // SDL_JOYSTICK_MFI
+
+#ifdef SDL_VIDEO_DRIVER_UIKIT
+        UIKit_SetGameControllerInteraction(true);
+#endif
     }
 
     return true;
@@ -888,11 +924,14 @@ static bool IOS_JoystickOpen(SDL_Joystick *joystick, int device_index)
 #ifdef SDL_JOYSTICK_MFI
         if (device->pause_button_index >= 0) {
             GCController *controller = device->controller;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
             controller.controllerPausedHandler = ^(GCController *c) {
               if (joystick->hwdata) {
                   joystick->hwdata->pause_button_pressed = SDL_GetTicks();
               }
             };
+#pragma clang diagnostic pop
         }
 
         if (@available(macOS 11.0, iOS 14.0, tvOS 14.0, *)) {
@@ -1536,7 +1575,10 @@ static void IOS_JoystickClose(SDL_Joystick *joystick)
 
         if (device->controller) {
             GCController *controller = device->controller;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
             controller.controllerPausedHandler = nil;
+#pragma clang diagnostic pop
             controller.playerIndex = -1;
 
             if (@available(macOS 11.0, iOS 14.0, tvOS 14.0, *)) {
@@ -1581,6 +1623,10 @@ static void IOS_JoystickQuit(void)
         while (deviceList != NULL) {
             IOS_RemoveJoystickDevice(deviceList);
         }
+
+#ifdef SDL_VIDEO_DRIVER_UIKIT
+        UIKit_SetGameControllerInteraction(false);
+#endif
     }
 
     numjoysticks = 0;

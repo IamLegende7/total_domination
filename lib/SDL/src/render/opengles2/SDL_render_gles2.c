@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -44,6 +44,11 @@
  */
 #define RENDERER_CONTEXT_MAJOR 2
 #define RENDERER_CONTEXT_MINOR 0
+
+// This is always the same number between the various EXT/ARB/GLES extensions.
+#ifndef GL_FRAMEBUFFER_SRGB
+#define GL_FRAMEBUFFER_SRGB 0x8DB9
+#endif
 
 /*************************************************************************************************
  * Context structures                                                                            *
@@ -628,6 +633,7 @@ static bool GLES2_SelectProgram(GLES2_RenderData *data, SDL_Texture *texture, GL
     GLES2_ShaderType vtype, ftype;
     GLES2_ProgramCacheEntry *program;
     GLES2_TextureData *tdata = texture ? (GLES2_TextureData *)texture->internal : NULL;
+    const bool colorswap = (data->drawstate.target && (data->drawstate.target->format == SDL_PIXELFORMAT_BGRA32 || data->drawstate.target->format == SDL_PIXELFORMAT_BGRX32));
     const float *shader_params = NULL;
     int shader_params_len = 0;
 
@@ -640,15 +646,27 @@ static bool GLES2_SelectProgram(GLES2_RenderData *data, SDL_Texture *texture, GL
     case GLES2_IMAGESOURCE_TEXTURE_INDEX8:
         switch (scale_mode) {
         case SDL_SCALEMODE_NEAREST:
-            ftype = GLES2_SHADER_FRAGMENT_TEXTURE_PALETTE_NEAREST;
+            if (colorswap) {
+                ftype = GLES2_SHADER_FRAGMENT_TEXTURE_PALETTE_NEAREST_COLORSWAP;
+            } else {
+                ftype = GLES2_SHADER_FRAGMENT_TEXTURE_PALETTE_NEAREST;
+            }
             break;
         case SDL_SCALEMODE_LINEAR:
-            ftype = GLES2_SHADER_FRAGMENT_TEXTURE_PALETTE_LINEAR;
+            if (colorswap) {
+                ftype = GLES2_SHADER_FRAGMENT_TEXTURE_PALETTE_LINEAR_COLORSWAP;
+            } else {
+                ftype = GLES2_SHADER_FRAGMENT_TEXTURE_PALETTE_LINEAR;
+            }
             shader_params = tdata->texel_size;
             shader_params_len = 4 * sizeof(float);
             break;
         case SDL_SCALEMODE_PIXELART:
-            ftype = GLES2_SHADER_FRAGMENT_TEXTURE_PALETTE_PIXELART;
+            if (colorswap) {
+                ftype = GLES2_SHADER_FRAGMENT_TEXTURE_PALETTE_PIXELART_COLORSWAP;
+            } else {
+                ftype = GLES2_SHADER_FRAGMENT_TEXTURE_PALETTE_PIXELART;
+            }
             shader_params = tdata->texel_size;
             shader_params_len = 4 * sizeof(float);
             break;
@@ -759,7 +777,9 @@ static bool GLES2_SelectProgram(GLES2_RenderData *data, SDL_Texture *texture, GL
     if (data->drawstate.program &&
         data->drawstate.program->vertex_shader == vertex &&
         data->drawstate.program->fragment_shader == fragment &&
-        data->drawstate.program->shader_params == shader_params) {
+        (!shader_params ||
+         (data->drawstate.program->shader_params &&
+          SDL_memcmp(shader_params, data->drawstate.program->shader_params, shader_params_len) == 0))) {
         return true;
     }
 
@@ -776,7 +796,7 @@ static bool GLES2_SelectProgram(GLES2_RenderData *data, SDL_Texture *texture, GL
 
     if (shader_params &&
         (!program->shader_params ||
-         SDL_memcmp(shader_params,  program->shader_params, shader_params_len) != 0)) {
+         SDL_memcmp(shader_params, program->shader_params, shader_params_len) != 0)) {
 #ifdef SDL_HAVE_YUV
         if (ftype >= GLES2_SHADER_FRAGMENT_TEXTURE_YUV) {
             // YUV shader params are Yoffset, 0, Rcoeff, 0, Gcoeff, 0, Bcoeff, 0
@@ -800,7 +820,7 @@ static bool GLES2_SelectProgram(GLES2_RenderData *data, SDL_Texture *texture, GL
         }
         else
 #endif
-        if (shader_params) {
+        {
             data->glUniform4f(program->uniform_locations[GLES2_UNIFORM_TEXEL_SIZE], shader_params[0], shader_params[1], shader_params[2], shader_params[3]);
         }
 
@@ -1700,7 +1720,6 @@ static bool GLES2_CreatePalette(SDL_Renderer *renderer, SDL_TexturePalette *pale
     if (!GL_CheckError("glGenTexures()", renderer)) {
         return false;
     }
-    data->glActiveTexture(GL_TEXTURE1);
     data->glBindTexture(GL_TEXTURE_2D, palettedata->texture);
     data->glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 256, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     if (!GL_CheckError("glTexImage2D()", renderer)) {
@@ -2382,6 +2401,7 @@ static bool GLES2_CreateRenderer(SDL_Renderer *renderer, SDL_Window *window, SDL
     renderer->name = GLES2_RenderDriver.name;
 
     // Create an OpenGL ES 2.0 context
+    SDL_GL_SetAttribute(SDL_GL_FRAMEBUFFER_SRGB_CAPABLE, 0);
     data->context = SDL_GL_CreateContext(window);
     if (!data->context) {
         goto error;
@@ -2417,10 +2437,10 @@ static bool GLES2_CreateRenderer(SDL_Renderer *renderer, SDL_Window *window, SDL
     data->glGetIntegerv(GL_FRAMEBUFFER_BINDING, &window_framebuffer);
     data->window_framebuffer = (GLuint)window_framebuffer;
 
-    SDL_AddSupportedTextureFormat(renderer, SDL_PIXELFORMAT_ARGB8888);
-    SDL_AddSupportedTextureFormat(renderer, SDL_PIXELFORMAT_ABGR8888);
-    SDL_AddSupportedTextureFormat(renderer, SDL_PIXELFORMAT_XRGB8888);
-    SDL_AddSupportedTextureFormat(renderer, SDL_PIXELFORMAT_XBGR8888);
+    SDL_AddSupportedTextureFormat(renderer, SDL_PIXELFORMAT_BGRA32);    // SDL_PIXELFORMAT_ARGB8888 on little endian systems
+    SDL_AddSupportedTextureFormat(renderer, SDL_PIXELFORMAT_RGBA32);
+    SDL_AddSupportedTextureFormat(renderer, SDL_PIXELFORMAT_BGRX32);
+    SDL_AddSupportedTextureFormat(renderer, SDL_PIXELFORMAT_RGBX32);
     SDL_AddSupportedTextureFormat(renderer, SDL_PIXELFORMAT_INDEX8);
 #ifdef SDL_HAVE_YUV
     SDL_AddSupportedTextureFormat(renderer, SDL_PIXELFORMAT_YV12);
@@ -2446,6 +2466,10 @@ static bool GLES2_CreateRenderer(SDL_Renderer *renderer, SDL_Window *window, SDL
     //  and an extension in GLES2.
     if ((major < 3) && !SDL_GL_ExtensionSupported("GL_ARB_texture_non_power_of_two")) {
         renderer->npot_texture_wrap_unsupported = true;
+    }
+
+    if (SDL_GL_ExtensionSupported("GL_EXT_sRGB_write_control")) {
+        data->glDisable(GL_FRAMEBUFFER_SRGB);
     }
 
     // Set up parameters for rendering

@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -2198,11 +2198,24 @@ SDL_Surface *SDL_RotateSurface(SDL_Surface *surface, float angle)
             SDL_DestroySurface(convert);
         }
     }
+
+    if (rotated) {
+        if (SDL_HasProperty(surface->props, SDL_PROP_SURFACE_ROTATION_FLOAT)) {
+            const float rotation = (SDL_GetNumberProperty(surface->props, SDL_PROP_SURFACE_ROTATION_FLOAT, 0) - angle);
+            SDL_SetFloatProperty(SDL_GetSurfaceProperties(rotated), SDL_PROP_SURFACE_ROTATION_FLOAT, rotation);
+        }
+    }
+
     return rotated;
 }
 
 SDL_Surface *SDL_DuplicateSurface(SDL_Surface *surface)
 {
+    CHECK_PARAM(!SDL_SurfaceValid(surface)) {
+        SDL_InvalidParamError("surface");
+        return NULL;
+    }
+
     return SDL_ConvertSurfaceAndColorspace(surface, surface->format, surface->palette, surface->colorspace, surface->props);
 }
 
@@ -2303,6 +2316,11 @@ error:
 
 SDL_Surface *SDL_ConvertSurfaceRect(SDL_Surface *surface, const SDL_Rect *rect, SDL_PixelFormat format)
 {
+    CHECK_PARAM(!SDL_SurfaceValid(surface)) {
+        SDL_InvalidParamError("surface");
+        return NULL;
+    }
+
     return SDL_ConvertSurfaceRectAndColorspace(surface, NULL, format, NULL, SDL_GetDefaultColorspaceForFormat(format), surface->props);
 }
 
@@ -3082,4 +3100,34 @@ void SDL_DestroySurface(SDL_Surface *surface)
     if (!(surface->internal_flags & SDL_INTERNAL_SURFACE_STACK)) {
         SDL_free(surface);
     }
+}
+
+SDL_Surface *SDL_LoadSurface_IO(SDL_IOStream *src, bool closeio)
+{
+    CHECK_PARAM(!src) {
+        SDL_InvalidParamError("src");
+        return NULL;
+    }
+
+    if (SDL_IsBMP(src)) {
+        return SDL_LoadBMP_IO(src, closeio);
+    } else if (SDL_IsPNG(src)) {
+        return SDL_LoadPNG_IO(src, closeio);
+    } else {
+        if (closeio) {
+            SDL_CloseIO(src);
+        }
+        SDL_SetError("Unsupported image format");
+        return NULL;
+    }
+}
+
+SDL_Surface *SDL_LoadSurface(const char *file)
+{
+    SDL_IOStream *stream = SDL_IOFromFile(file, "rb");
+    if (!stream) {
+        return NULL;
+    }
+
+    return SDL_LoadSurface_IO(stream, true);
 }

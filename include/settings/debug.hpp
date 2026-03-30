@@ -18,6 +18,8 @@ inline void init_debug_settings(std::string config_file) {
     // Logging // 
     DEBUG["test_logger"] =              Setting(load_setting<bool>(config_file, "Logging", "test_logger", false));
     DEBUG["all_debug_logs"] =           Setting(load_setting<bool>(config_file, "Logging", "all_debug_logs", false));
+    // OverwritingUI //
+    DEBUG["force_load_map"] =           Setting(load_setting<std::string>(config_file, "OverwritingUI", "force_load_map", "none"));
 };
 
 #endif

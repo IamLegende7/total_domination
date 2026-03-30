@@ -1,6 +1,6 @@
 /*
   SDL_image:  An example image loading library for use with SDL
-  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -64,6 +64,8 @@
 #define sqrtf   SDL_sqrtf
 #define tanf    SDL_tanf
 #define roundf  SDL_roundf
+#undef  isnan
+#define isnan   SDL_isnanf
 #ifndef FLT_MAX
 #define FLT_MAX     3.402823466e+38F
 #endif
@@ -164,16 +166,12 @@ SDL_Surface *IMG_LoadSizedSVG_IO(SDL_IOStream *src, int width, int height)
 /* See if an image is contained in a data source */
 bool IMG_isSVG(SDL_IOStream *src)
 {
-    (void)src;
     return false;
 }
 
 /* Load a SVG type image from an SDL datasource */
 SDL_Surface *IMG_LoadSizedSVG_IO(SDL_IOStream *src, int width, int height)
 {
-    (void)src;
-    (void)width;
-    (void)height;
     SDL_SetError("SDL_image built without SVG support");
     return NULL;
 }

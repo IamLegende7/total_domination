@@ -1,6 +1,6 @@
 /*
   SDL_image:  An example image loading library for use with SDL
-  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -112,14 +112,12 @@ SDL_Surface *IMG_LoadQOI_IO(SDL_IOStream *src)
 /* See if an image is contained in a data source */
 bool IMG_isQOI(SDL_IOStream *src)
 {
-    (void)src;
     return false;
 }
 
 /* Load a QOI type image from an SDL datasource */
 SDL_Surface *IMG_LoadQOI_IO(SDL_IOStream *src)
 {
-    (void)src;
     SDL_SetError("SDL_image built without QOI support");
     return NULL;
 }

@@ -309,8 +309,21 @@ void RenderAgent::render(bool clear_renderer) {
                 LOG(LogLevel::WARNING, "Texture '%s' not found", sprite.texture.c_str());
             }
             SDL_Texture* texture = agent_textures[sprite.texture].get_texture();
-            SDL_FRect dstrect = {(float)((entity.x-CAMERA.x)*CAMERA.zoom), (float)((entity.y-CAMERA.y)*CAMERA.zoom), (sprite.texture_rect.w*CAMERA.zoom), (sprite.texture_rect.h*CAMERA.zoom)};
-            SDL_RenderTexture(RENDERER, texture, &sprite.texture_rect, &dstrect);
+            SDL_FRect dstrect = {
+                (float)((entity.x-CAMERA.x)*CAMERA.zoom),
+                (float)((entity.y-CAMERA.y)*CAMERA.zoom),
+                (sprite.texture_rect.w*CAMERA.zoom),
+                (sprite.texture_rect.h*CAMERA.zoom)
+            };
+            SDL_FRect screen_rect = {
+                (float)(DEBUG["show_tile_hiding"] ? 50  : 0),
+                (float)(DEBUG["show_tile_hiding"] ? 50  : 0),
+                (float)(DEBUG["show_tile_hiding"] ? SCREEN_WIDTH-100  : SCREEN_WIDTH),
+                (float)(DEBUG["show_tile_hiding"] ? SCREEN_HEIGHT-100 : SCREEN_HEIGHT)
+            };
+            if (SDL_HasRectIntersectionFloat(&dstrect, &screen_rect)) {
+                SDL_RenderTexture(RENDERER, texture, &sprite.texture_rect, &dstrect);
+            }
         }
 
         SDL_RenderPresent(RENDERER);

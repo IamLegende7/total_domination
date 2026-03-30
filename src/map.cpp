@@ -2,6 +2,7 @@
 
 #include <SDL3/SDL.h>
 #include <set>
+#include <SDL3/SDL_timer.h>
 #include "rapidjson/document.h"
 
 #include "utils/json.hpp"
@@ -12,6 +13,10 @@
 #include "utils/logger.hpp"
 
 Map::Map(RenderAgent* agent, const std::string& map_path) {
+    LOG(LogLevel::INFO, "Loading map \"%s\"", replace_locations(map_path).c_str());
+    Uint64 load_start_time = SDL_GetPerformanceCounter();
+    Uint64 preformance_frequency = SDL_GetPerformanceFrequency();
+
     this->agent = agent;
     // CHECKS AND BASIC DATA //
     this->map_path = map_path;
@@ -46,11 +51,23 @@ Map::Map(RenderAgent* agent, const std::string& map_path) {
                 TextureConstructor* texture_constructors[declaration.value.Size()];
                 for (size_t constructor_index = 0; constructor_index < declaration.value.Size(); ++constructor_index) {
                     texture_constructors[constructor_index] = new TextureConstructor(
-                        declaration.value[constructor_index].HasMember("texture") ? declaration.value[constructor_index]["texture"].GetString() : "td:missing",
-                        declaration.value[constructor_index].HasMember("texture") ? get_texture(declaration.value[constructor_index]["texture"].GetString()) : get_texture("td:missing"),
-                        declaration.value[constructor_index].HasMember("x") ? declaration.value[constructor_index]["x"].GetInt() : 0,
-                        declaration.value[constructor_index].HasMember("y") ? declaration.value[constructor_index]["y"].GetInt() : 0,
-                        declaration.value[constructor_index].HasMember("size") ? declaration.value[constructor_index]["size"].GetInt() : 1
+                        declaration.value[constructor_index].HasMember("texture") ?
+                            declaration.value[constructor_index]["texture"].GetString() :
+                            "td:missing",
+                        agent->texture_exists(declaration.value[constructor_index]["texture"].GetString()) ?
+                            "td:none" :
+                            (declaration.value[constructor_index].HasMember("texture") ?
+                                get_texture_path(declaration.value[constructor_index]["texture"].GetString()) :
+                                get_texture_path("td:missing")),
+                        declaration.value[constructor_index].HasMember("x") ?
+                            declaration.value[constructor_index]["x"].GetInt() :
+                            0,
+                        declaration.value[constructor_index].HasMember("y") ?
+                            declaration.value[constructor_index]["y"].GetInt() :
+                            0,
+                        declaration.value[constructor_index].HasMember("size") ?
+                            declaration.value[constructor_index]["size"].GetInt() :
+                            1
                     );
                 }
                 agent->insert_texture(declaration.name.GetString(), agent->bake_texture(texture_constructors, (sizeof(texture_constructors) / sizeof(texture_constructors[0]))));
@@ -95,6 +112,10 @@ Map::Map(RenderAgent* agent, const std::string& map_path) {
             }
         }
     }
+
+    Uint64 elapsed_ticks = SDL_GetPerformanceCounter() - load_start_time;
+    double elapsed_ms = (elapsed_ticks / (double)preformance_frequency) * 1000.0;
+    LOG(LogLevel::INFO, "Loaded Map \"%s\" in %f ms", map_name.c_str(), elapsed_ms);
 }
 
 Map::~Map() {

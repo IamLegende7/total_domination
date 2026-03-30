@@ -1,6 +1,6 @@
 /*
   SDL_image:  An example image loading library for use with SDL
-  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -23,16 +23,20 @@
 
 #include <SDL3_image/SDL_image.h>
 
-#if !defined(SDL_IMAGE_LIBPNG)
+#ifdef PNG_USES_IMAGEIO
+#include "IMG_ImageIO.h"
+#endif
+
+#include "IMG_libpng.h"
+#include "IMG_WIC.h"
 
 /* We'll have PNG save support by default */
 #if !defined(SAVE_PNG)
 #define SAVE_PNG 1
 #endif
 
-#if defined(LOAD_PNG) && defined(USE_STBIMAGE)
+#if defined(LOAD_PNG)
 
-/* FIXME: This is a copypaste from LIBPNG! Pull that out of the ifdefs */
 /* See if an image is contained in a data source */
 bool IMG_isPNG(SDL_IOStream *src)
 {
@@ -61,7 +65,23 @@ bool IMG_isPNG(SDL_IOStream *src)
 /* Load a PNG type image from an SDL datasource */
 SDL_Surface *IMG_LoadPNG_IO(SDL_IOStream *src)
 {
+#ifdef SDL_IMAGE_LIBPNG
+    if (IMG_InitPNG()) {
+        return IMG_LoadPNG_LIBPNG(src);
+    }
+#endif
+
+#if defined(SDL_IMAGE_USE_WIC_BACKEND)
+    if (WIC_Init()) {
+        return WIC_LoadImage(src);
+    }
+#endif
+
+#ifdef PNG_USES_IMAGEIO
+    return IMG_LoadPNG_ImageIO(src);
+#else
     return SDL_LoadPNG_IO(src, false);
+#endif
 }
 
 #else
@@ -69,14 +89,12 @@ SDL_Surface *IMG_LoadPNG_IO(SDL_IOStream *src)
 /* See if an image is contained in a data source */
 bool IMG_isPNG(SDL_IOStream *src)
 {
-    (void)src;
     return false;
 }
 
 /* Load a PNG type image from an SDL datasource */
 SDL_Surface *IMG_LoadPNG_IO(SDL_IOStream *src)
 {
-    (void)src;
     SDL_SetError("SDL_image built without PNG support");
     return NULL;
 }
@@ -87,6 +105,12 @@ SDL_Surface *IMG_LoadPNG_IO(SDL_IOStream *src)
 
 bool IMG_SavePNG_IO(SDL_Surface *surface, SDL_IOStream *dst, bool closeio)
 {
+#ifdef SDL_IMAGE_LIBPNG
+    if (IMG_InitPNG()) {
+        return IMG_SavePNG_LIBPNG(surface, dst, closeio);
+    }
+#endif
+
     return SDL_SavePNG_IO(surface, dst, closeio);
 }
 
@@ -104,19 +128,12 @@ bool IMG_SavePNG(SDL_Surface *surface, const char *file)
 
 bool IMG_SavePNG_IO(SDL_Surface *surface, SDL_IOStream *dst, bool closeio)
 {
-    (void)surface;
-    (void)dst;
-    (void)closeio;
     return SDL_SetError("SDL_image built without PNG save support");
 }
 
 bool IMG_SavePNG(SDL_Surface *surface, const char *file)
 {
-    (void)surface;
-    (void)file;
     return SDL_SetError("SDL_image built without PNG save support");
 }
 
 #endif // SAVE_PNG
-
-#endif /* SDL_IMAGE_LIBPNG */

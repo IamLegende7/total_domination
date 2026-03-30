@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -1069,7 +1069,6 @@ static const char *GetBindingInstruction(void)
         default:
             return "";
         }
-        break;
     case SDL_GAMEPAD_BUTTON_BACK:
         return "Press the left center button (Back/View/Share)";
     case SDL_GAMEPAD_BUTTON_GUIDE:
@@ -1587,7 +1586,10 @@ static bool SDLCALL VirtualGamepadSetLED(void *userdata, Uint8 red, Uint8 green,
 static void OpenVirtualGamepad(void)
 {
     SDL_VirtualJoystickTouchpadDesc virtual_touchpad = { 1, { 0, 0, 0 } };
-    SDL_VirtualJoystickSensorDesc virtual_sensor = { SDL_SENSOR_ACCEL, 0.0f };
+    SDL_VirtualJoystickSensorDesc virtual_sensors[] = {
+        { SDL_SENSOR_ACCEL, 0.0f },
+        { SDL_SENSOR_GYRO, 0.0f }
+    };
     SDL_VirtualJoystickDesc desc;
     SDL_JoystickID virtual_id;
 
@@ -1601,8 +1603,8 @@ static void OpenVirtualGamepad(void)
     desc.nbuttons = SDL_GAMEPAD_BUTTON_COUNT;
     desc.ntouchpads = 1;
     desc.touchpads = &virtual_touchpad;
-    desc.nsensors = 1;
-    desc.sensors = &virtual_sensor;
+    desc.nsensors = SDL_arraysize(virtual_sensors);
+    desc.sensors = virtual_sensors;
     desc.SetPlayerIndex = VirtualGamepadSetPlayerIndex;
     desc.Rumble = VirtualGamepadRumble;
     desc.RumbleTriggers = VirtualGamepadRumbleTriggers;
@@ -2362,10 +2364,13 @@ SDL_AppResult SDLCALL SDL_AppEvent(void *appstate, SDL_Event *event)
 
 SDL_AppResult SDLCALL SDL_AppIterate(void *appstate)
 {
-    /* If we have a virtual controller, send a virtual accelerometer sensor reading */
+    /* If we have a virtual controller, send virtual sensor readings */
     if (virtual_joystick) {
-        float data[3] = { 0.0f, SDL_STANDARD_GRAVITY, 0.0f };
-        SDL_SendJoystickVirtualSensorData(virtual_joystick, SDL_SENSOR_ACCEL, SDL_GetTicksNS(), data, SDL_arraysize(data));
+        float accel_data[3] = { 0.0f, SDL_STANDARD_GRAVITY, 0.0f };
+        float gyro_data[3] = { 0.01f, -0.01f, 0.0f };
+        Uint64 sensor_timestamp = SDL_GetTicksNS();
+        SDL_SendJoystickVirtualSensorData(virtual_joystick, SDL_SENSOR_ACCEL, sensor_timestamp, accel_data, SDL_arraysize(accel_data));
+        SDL_SendJoystickVirtualSensorData(virtual_joystick, SDL_SENSOR_GYRO, sensor_timestamp, gyro_data, SDL_arraysize(gyro_data));
     }
 
     /* Wait 30 ms for joystick events to stop coming in,

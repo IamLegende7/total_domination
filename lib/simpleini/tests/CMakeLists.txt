@@ -2,6 +2,8 @@ if(SIMPLEINI_USE_SYSTEM_GTEST)
 	find_package(GTest REQUIRED)
 else()
 	include(FetchContent)
+    # do not install GoogleTest
+    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 	# Force GoogleTest to use the same runtime library as our tests (MSVC)
 	set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 	FetchContent_Declare(

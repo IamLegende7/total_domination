@@ -8,14 +8,16 @@ inline SDL_Window* WINDOW = nullptr;
 inline SDL_Renderer* RENDERER = nullptr;
 inline SDL_GPUDevice* GPU = nullptr;
 
-// Frame rate //
-const int TARGET_FPS = 60;
-const float TIME_STEP = 1.0f / TARGET_FPS;
+// The how manyth tick in a second we are on right now
+inline Uint8 TICKS = 0;
+inline float ACTUAL_FRAME_RATE = 0;
+inline float ACTUAL_TICK_RATE = 0;
 
 inline bool DIRTY_SCREEN = true;
 
 // 0: main menu; 1: in-game, payer turn; 2: enemy turn; 3: pause menu
 inline int MODE = 0;
+inline bool PAUSE = false; // TODO: implement
 
 inline int SCREEN_WIDTH = 640;
 inline int SCREEN_HEIGHT = 480;

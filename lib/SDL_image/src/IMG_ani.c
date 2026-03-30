@@ -1,6 +1,6 @@
 /*
   SDL_image:  An example image loading library for use with SDL
-  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -445,7 +445,7 @@ bool IMG_CreateANIAnimationDecoder(IMG_AnimationDecoder *decoder, SDL_Properties
     bool ignoreProps = SDL_GetBooleanProperty(props, IMG_PROP_METADATA_IGNORE_PROPS_BOOLEAN, false);
     if (!ignoreProps) {
         // Allow implicit properties to be set which are not globalized but specific to the decoder.
-        SDL_SetNumberProperty(decoder->props, "IMG_PROP_METADATA_FRAME_COUNT_NUMBER", ctx->frame_count);
+        SDL_SetNumberProperty(decoder->props, IMG_PROP_METADATA_FRAME_COUNT_NUMBER, ctx->frame_count);
 
         if (parse.title && *parse.title) {
             SDL_SetStringProperty(decoder->props, IMG_PROP_METADATA_TITLE_STRING, parse.title);
@@ -470,14 +470,11 @@ done:
 
 bool IMG_isANI(SDL_IOStream *src)
 {
-    (void)src;
     return false;
 }
 
 bool IMG_CreateANIAnimationDecoder(IMG_AnimationDecoder *decoder, SDL_PropertiesID props)
 {
-    (void)decoder;
-    (void)props;
     return SDL_SetError("SDL_image built without ANI support");
 }
 
@@ -604,11 +601,11 @@ static bool WriteAnimation(IMG_AnimationEncoder *encoder)
 
     ANIHEADER anih;
     SDL_zero(anih);
-    anih.cbSizeof = sizeof(anih);
-    anih.frames = ctx->num_frames;
-    anih.steps = ctx->num_frames;
-    anih.jifRate = 1;
-    anih.fl = ANI_FLAG_ICON;
+    anih.cbSizeof = SDL_Swap32LE(sizeof(anih));
+    anih.frames = SDL_Swap32LE(ctx->num_frames);
+    anih.steps = SDL_Swap32LE(ctx->num_frames);
+    anih.jifRate = SDL_Swap32LE(1);
+    anih.fl = SDL_Swap32LE(ANI_FLAG_ICON);
     result &= (SDL_WriteIO(dst, &anih, sizeof(anih)) == sizeof(anih));
 
     // Info list
@@ -694,8 +691,6 @@ bool IMG_CreateANIAnimationEncoder(IMG_AnimationEncoder *encoder, SDL_Properties
 
 bool IMG_CreateANIAnimationEncoder(IMG_AnimationEncoder *encoder, SDL_PropertiesID props)
 {
-    (void)encoder;
-    (void)props;
     return SDL_SetError("SDL_image built without ANI save support");
 }
 

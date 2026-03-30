@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
     }
 
     if (image_file) {
-        shape = SDL_strstr(image_file, ".png") ? SDL_LoadPNG(image_file) : SDL_LoadBMP(image_file);
+        shape = SDL_LoadSurface(image_file);
         if (!shape) {
             SDL_Log("Couldn't load %s: %s", image_file, SDL_GetError());
             goto quit;

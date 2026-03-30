@@ -1,6 +1,6 @@
 /*
   SDL_image:  An example image loading library for use with SDL
-  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -202,7 +202,6 @@ Uint64 IMG_GetEncoderDuration(IMG_AnimationEncoder *encoder, Uint64 duration, Ui
 
 static void SDLCALL HasMetadataCallback(void *userdata, SDL_PropertiesID props, const char *name)
 {
-    (void)props;
     bool *has_metadata = (bool *)userdata;
 
     if (SDL_strncmp(name, "SDL_image.metadata.", 19) == 0) {

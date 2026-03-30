@@ -8,13 +8,16 @@ inline std::unordered_map<std::string, Setting> SETTINGS;
 inline void init_main_settings(std::string config_file) {
     // Misc //
     SETTINGS["initial_camera_zoom"] = Setting(load_setting<int>(config_file, "Misc", "initial_camera_zoom", 5));
+    // Ticking //
+    SETTINGS["max_frame_rate"] =   Setting(load_setting<int>(config_file, "Ticking", "max_frame_rate", 60));
+    SETTINGS["tick_rate"] =           Setting(load_setting<int>(config_file, "Ticking", "tick_rate", 20));
+    SETTINGS["input_tick_rate"] =     Setting(load_setting<int>(config_file, "Ticking", "input_tick_rate", 5));
     // Mulithreading //
     SETTINGS["multithreading"] =      Setting(load_setting<bool>(config_file, "Multithreading", "multithreading", false));
     SETTINGS["num_threads"] =         Setting(load_setting<int>(config_file, "Multithreading", "num_threads", 1));
-    // Renderring
-    SETTINGS["software_renderring"] = Setting(load_setting<bool>(config_file, "Renderring", "software_renderring", true));
-    SETTINGS["gpu_driver"] =          Setting(load_setting<std::string>(config_file, "Renderring", "gpu_driver"));
-    // Status //
+    // Input //
+    SETTINGS["input_mode"] =          Setting(load_setting<int>(config_file, "Input", "input_mode", 0));
+    SETTINGS["camera_speed"] =        Setting(load_setting<int>(config_file, "Input", "camera_speed", 1));
 }
 
 #endif

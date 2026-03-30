@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -86,7 +86,7 @@ static SDL_PenID UIKit_AddPenIfNecesary(SDL_Window *window)
         // so we can't use it for tangential pressure.
 
         // There's only ever one Apple Pencil at most, so we just pass a non-zero value for the handle.
-        apple_pencil_id = SDL_AddPenDevice(0, "Apple Pencil", window, &info, (void *) (size_t) 0x1);
+        apple_pencil_id = SDL_AddPenDevice(0, "Apple Pencil", window, &info, (void *) (size_t) 0x1, true);
     }
 
     return apple_pencil_id;
@@ -134,7 +134,7 @@ static void UIKit_HandlePenAxes(SDL_Window *window, NSTimeInterval nstimestamp, 
 }
 
 #if !defined(SDL_PLATFORM_TVOS)
-extern void UIKit_HandlePenHover(SDL_uikitview *view, UIHoverGestureRecognizer *recognizer)
+void UIKit_HandlePenHover(SDL_uikitview *view, UIHoverGestureRecognizer *recognizer)
 {
     float zOffset = 0.0f;
     if (@available(iOS 16.1, *)) {
