@@ -9,10 +9,11 @@ auto_package=false
 install_build_dependencies=true
 do_cleanup=false
 show_warning=true
-compile_shadercross=true
+compile_shadercross=false
 compile_shaders=false
+download_submodules=false
 
-OPTIONS=$(getopt -o c,p,d,h,s --long clean,auto-package,no-install-deps,cleanup,help,no-show-warning,no-shadercross,offline-shaders -- "$@")
+OPTIONS=$(getopt -o c,p,d,h,s --long clean,auto-package,no-install-deps,cleanup,help,no-show-warning,shadercross,offline-shaders,download -- "$@")
 eval set -- "$OPTIONS"
 while true; do
   case "$1" in
@@ -36,12 +37,16 @@ while true; do
       show_warning=false
       shift
       ;;
-    --no-shadercross)
-      compile_shadercross=false
+    --shadercross)
+      compile_shadercross=true
       shift
       ;;
     -s|--offline-shaders)
       compile_shaders=true
+      shift
+      ;;
+    --download)
+      download_submodules=true
       shift
       ;;
     --)
@@ -49,19 +54,20 @@ while true; do
       break
       ;;
     -h|--help)
-      echo "Usage: $0 [-c|--clean] [-p|--auto-package] [-d|--no-install-deps] [--cleanup]"
+      echo "Usage: $0 [-c|--clean] [-p|--auto-package] [-d|--no-install-deps] [--cleanup] [--download]"
       echo ""
       echo "[-c|--clean]           Make a clean build (Remove all old build files & binarys)"
       echo "[-p|--auto-package]    Package the compiled code using package.sh into a .tar.gz with only the importand files"
       echo "[-d|--no-install-deps] Don't install dependencies automatically"
       echo "[--cleanup]            Cleanup build files"
       echo "[--no-show-warning]    Don't show the 'Has only been tested on arch' warning"
-      echo "[--no-shadercross]     Don't compile SDL_shadercross. Drasticly shortens the compile times, but the shadercross will need to be compiled at least once for SDL_gpu to work"
+      echo "[--shadercross]        Compile SDL_shadercross. Drasticly increases the compile times, but the shadercross will need to be compiled at least once for SDL_gpu to work (render mode 0)"
       echo "[-s|--offline-shaders] Precompile shaders"
+      echo "[--download]           Run lib/download.sh before building. Omit if you used 'git clone --recursive' or manually ran lib/download.sh."
       exit 1
       ;;
     *) 
-      echo "Usage: $0 [-c|--clean] [-p|--auto-package] [-d|--no-install-deps] [--cleanup]"
+      echo "Usage: $0 [-c|--clean] [-p|--auto-package] [-d|--no-install-deps] [--cleanup] [--download]"
       echo Try '$0 --help' for more information.
       exit 1
       ;;
@@ -100,7 +106,11 @@ if [ "$install_build_dependencies" = true ]; then
     fi
 fi
 
-
+if [ "$download_submodules" = true ]; then
+    echo "Downloading Submodules (libraries).."
+    ./lib/download.sh
+    echo "Done!"
+fi
 
 if [ "$do_clean_build" = true ]; then
     if [ "$(ls -A build)" ]; then 

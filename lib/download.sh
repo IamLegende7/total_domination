@@ -13,5 +13,11 @@ while true; do
     read line; set -- $line
     url=$3
     
-    git clone --filter=blob:none $url $path --recursive $ARGUMENTS
+    if [ -d "$path" ]; then
+        if [ ! "$(ls -A $path)" ]; then
+            git clone --filter=blob:none $url $path --recursive $ARGUMENTS
+        else
+            echo "Module $path already exists; skipping!"
+        fi
+    fi
 done

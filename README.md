@@ -7,6 +7,5 @@ It is currently a work-in-progress, but you can compile it (if you are on Linux)
 ```bash
 git clone https://github.com/IamLegende7/total_domination.git
 cd total_domination
-bash lib/download.sh
-bash build.sh
+bash build.sh --download
 ```
