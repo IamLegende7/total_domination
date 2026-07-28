@@ -2,14 +2,17 @@
 #define SETTINGS_MAIN_HPP
 
 #include "utils/config.hpp"
+#include "settings/locations.hpp"
 
 inline std::unordered_map<std::string, Setting> SETTINGS;
 
 inline void init_main_settings(std::string config_file) {
     // Misc //
+    SETTINGS["font"] =                Setting(replace_locations(load_setting<std::string>(config_file, "Misc", "font", "$resource_dir$/fonts/RobotoMono-Regular.ttf")));
+    SETTINGS["font_size"] =           Setting(load_setting<int>(config_file, "Misc", "font_size", 50));
     SETTINGS["initial_camera_zoom"] = Setting(load_setting<int>(config_file, "Misc", "initial_camera_zoom", 5));
     // Ticking //
-    SETTINGS["max_frame_rate"] =   Setting(load_setting<int>(config_file, "Ticking", "max_frame_rate", 60));
+    SETTINGS["max_frame_rate"] =      Setting(load_setting<int>(config_file, "Ticking", "max_frame_rate", 60));
     SETTINGS["tick_rate"] =           Setting(load_setting<int>(config_file, "Ticking", "tick_rate", 20));
     SETTINGS["input_tick_rate"] =     Setting(load_setting<int>(config_file, "Ticking", "input_tick_rate", 5));
     // Mulithreading //

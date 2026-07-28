@@ -16,6 +16,10 @@
 
 #include "inputs.hpp"
 
+
+// Reloading settings
+#include "callback_functions.hpp"
+
 InputHandler::InputHandler() {
 
 }
@@ -50,6 +54,12 @@ bool InputHandler::process() {
 }
 
 bool InputHandler::process_game_keyboard() {
+    // Reloading settings
+    if (keyboard_state[SDL_SCANCODE_R] != 0) {
+        LOG(LogLevel::INFO, "Reloading Settings...");
+        load_settings();
+        SDL_Delay(100);       
+    }
     // Camera
     if (keyboard_state[SDL_SCANCODE_LEFT] != 0) {
         CAMERA.x -= SETTINGS["camera_speed"];

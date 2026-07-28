@@ -44,31 +44,20 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
     load_settings();
 
     // LOGGER //
-    LOGGER.set_logfile(LOCATIONS["log_file"]); // Logger function has its own error handeling
+    LOGGER.set_logfile(LOCATIONS["log_file"]); // Logger function has its own error handling
 
     // SDL //
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
-        LOG(LogLevel::CRITICAL, "SDL could not initialize: %s\n", SDL_GetError());
+        LOG(LogLevel::CRITICAL, "SDL could not initialize: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     } else {
         LOG(LogLevel::INFO, "SDL initialized successfully.");
     }
 
-    // GPU DEVICE //
-    if (int(RENDER_SETTINGS["render_mode"]) == 0) {
-        GPU = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL | SDL_GPU_SHADERFORMAT_MSL, false, std::string(RENDER_SETTINGS["gpu_driver"]).c_str());
-        if (GPU == NULL) {
-            LOG(LogLevel::ERROR, "Could not create GPU device: %s", SDL_GetError());
-            LOG(LogLevel::WARNING, "Falling back to renderer..");
-            RENDER_SETTINGS["render_mode"].set(1);
-        } else {
-            LOG(LogLevel::INFO, "Using GPU driver %s", SDL_GetGPUDeviceDriver(GPU));
-        }
-    }
-
-    // SOFTWARE RENDERRING WARNING //
-    if (int(RENDER_SETTINGS["render_mode"]) == 2) {
-        LOG(LogLevel::WARNING, "Using software renderring");
+    // SDL_ttf init //
+    if (!TTF_Init()) {
+        LOG(LogLevel::CRITICAL, "SDL_ttf could not initialize: %s", SDL_GetError());
+        STATUS_TTF_LOADED = false;
     }
 
     // WINDOW //
@@ -79,21 +68,9 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
         return SDL_APP_FAILURE;
     }
 
-    // CLAIM WINDOW //
-    if ((int(RENDER_SETTINGS["render_mode"]) > 2) || (int(RENDER_SETTINGS["render_mode"]) < 0)) return SDL_APP_FAILURE;
-    if (int(RENDER_SETTINGS["render_mode"]) == 0) {
-        if (!SDL_ClaimWindowForGPUDevice(GPU, WINDOW)) {
-            LOG(LogLevel::ERROR, "Could not claim Main Window for GPU: %s", SDL_GetError());
-            RENDER_SETTINGS["render_mode"].set(1);
-            LOG(LogLevel::WARNING, "Using software renderring");
-            // GPU device cleanup
-            SDL_DestroyGPUDevice(GPU);
-        }
-
-        // VSYNC (GPU) //
-        // https://discourse.libsdl.org/t/how-to-enable-disable-vsync-with-sdl3-gpu-no-sdl-renderer/61735/2
-        bool supports_mailbox = SDL_WindowSupportsGPUPresentMode(GPU, WINDOW, SDL_GPU_PRESENTMODE_MAILBOX);
-        SDL_SetGPUSwapchainParameters(GPU, WINDOW, SDL_GPU_SWAPCHAINCOMPOSITION_SDR, supports_mailbox ? SDL_GPU_PRESENTMODE_MAILBOX : SDL_GPU_PRESENTMODE_VSYNC);
+    if ((int(RENDER_SETTINGS["render_mode"]) > 2) || (int(RENDER_SETTINGS["render_mode"]) < 1)) {
+        LOG(LogLevel::CRITICAL, "Invalid render_mode \"%d\".", int(RENDER_SETTINGS["render_mode"]));
+        return SDL_APP_FAILURE;
     }
 
     if (int(RENDER_SETTINGS["render_mode"]) == 1) {
@@ -102,6 +79,7 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
         if (RENDERER == NULL) {
             LOG(LogLevel::ERROR, "Renderrer could not be created: %s", SDL_GetError());
             LOG(LogLevel::WARNING, "Falling back to software renderer..");
+            STATUS_FORCED_RENDERMODE = 2;
             RENDER_SETTINGS["render_mode"].set(2);
         }
 
@@ -109,14 +87,14 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
         if (!SDL_SetRenderVSync(RENDERER, 1)) {
             LOG(LogLevel::ERROR, "VSync could not be enabled: %s", SDL_GetError());
         }
-    } else if (int(RENDER_SETTINGS["render_mode"]) == 2) {
-        SDL_Surface* window_surface = SDL_GetWindowSurface(WINDOW);
-        RENDERER = SDL_CreateSoftwareRenderer(window_surface);
-        if (RENDERER == NULL) {
-            LOG(LogLevel::ERROR, "Software renderer could not be created: %s", SDL_GetError());
-            LOG(LogLevel::CRITICAL, "Nothing to fall back to.. aboarding!");
-            return SDL_APP_FAILURE;
-        }
+    } else if (int(RENDER_SETTINGS["render_mode"]) == 2) { // TODO
+        LOG(LogLevel::CRITICAL, "Software Renderer not implemented!");
+        return SDL_APP_FAILURE;
+    }
+
+    // SOFTWARE RENDERRING WARNING //
+    if (int(RENDER_SETTINGS["render_mode"]) == 2) {
+        LOG(LogLevel::WARNING, "Using software renderring");
     }
 
     // Render Agents //
@@ -199,22 +177,20 @@ void quit(void *appstate, SDL_AppResult result) {
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "TD Chrash-Handler", crash_message.c_str(), NULL);
     }
 
-    delete MAIN_MAP;
-
-    delete MAIN_RENDER_AGENT;
     LOG(LogLevel::INFO, "Cleaning up");
-    //SDL_DestroyGPUDevice(GPU);
-    //SDL_DestroyRenderer(RENDERER);
-    //SDL_DestroyWindow(WINDOW);
-    if (GPU != NULL) {
-        if (WINDOW != NULL) {
-            SDL_ReleaseWindowFromGPUDevice(GPU, WINDOW);
-            SDL_DestroyWindow(WINDOW);
-        }
 
-        SDL_DestroyGPUDevice(GPU);
+    delete MAIN_MAP;
+    delete MAIN_RENDER_AGENT;
+    delete INPUTS;
+
+    if (RENDERER != NULL) {
+        SDL_DestroyRenderer(RENDERER);
+    }
+    if (WINDOW != NULL) {
+        SDL_DestroyWindow(WINDOW);
     }
 
+    TTF_Quit();
     SDL_Quit();
 }
 

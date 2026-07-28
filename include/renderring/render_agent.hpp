@@ -19,49 +19,19 @@
 #include "settings/debug.hpp"
 
 struct RenderAgentTexture {
-    std::variant<SDL_Texture*, SDL_GPUTexture*> texture;
+    SDL_Texture* texture;
     int width, height;
 
     RenderAgentTexture()
         : texture(static_cast<SDL_Texture*>(nullptr)), width(0), height(0) {};
     RenderAgentTexture(SDL_Texture* texture, int width, int height)
         : texture(texture), width(width), height(height) {};
-    RenderAgentTexture(SDL_GPUTexture* texture, int width, int height)
-        : texture(texture), width(width), height(height) {};
     void cleanup() {
-        if (texture.index() == 1) {
-            SDL_ReleaseGPUTexture(GPU, std::get<SDL_GPUTexture*>(texture));
-        } else {
-            SDL_DestroyTexture(std::get<SDL_Texture*>(texture));
-        }
+        SDL_DestroyTexture(texture);
     };
 
     SDL_Texture* get_texture() {
-        if (!std::holds_alternative<SDL_Texture*>(texture) && !std::holds_alternative<SDL_GPUTexture*>(texture)) {
-            LOG(LogLevel::ERROR, "Trying to access an invalid texture.");
-            return nullptr;
-        }
-
-        if (texture.index() == 0) {
-            return std::get<SDL_Texture*>(texture);
-        } else {
-            LOG(LogLevel::ERROR, "Tried to load SDL_Texture* while type is SDL_GPUTexture*.");
-            return nullptr;
-        }
-    };
-
-    SDL_GPUTexture* get_gpu_texture() {
-        if (!std::holds_alternative<SDL_Texture*>(texture) && !std::holds_alternative<SDL_GPUTexture*>(texture)) {
-            LOG(LogLevel::ERROR, "Trying to access an invalid texture.");
-            return nullptr;
-        }
-
-        if (texture.index() == 1) {
-            return std::get<SDL_GPUTexture*>(texture);
-        } else {
-            LOG(LogLevel::ERROR, "Tried to load SDL_GPUTexture* while type is SDL_Texture*.");
-            return nullptr;
-        }
+        return texture;
     };
 };
 
@@ -108,10 +78,6 @@ class RenderAgent {
         std::unordered_map<std::string, RenderAgentTexture> agent_textures;
         std::unordered_map<std::string, RenderAgentSprite> agent_sprites;
         std::vector<RenderAgentEntity> agent_entitys;
-        SDL_GPUGraphicsPipeline *pipeline = NULL;
-        SDL_GPUSampler* sampler = NULL;
-        //SDL_GPUTransferBuffer* sprite_data_transfer_buffer = NULL;
-        //SDL_GPUBuffer* sprite_data_buffer = NULL;
         
     public:
         RenderAgent(SDL_Window* window = WINDOW);
@@ -122,18 +88,17 @@ class RenderAgent {
         RenderAgentTexture load_texture(const std::string& id, const std::string& texture_path);
         bool insert_texture(const std::string& id, RenderAgentTexture texture);
         bool texture_exists(const std::string& id);
-        RenderAgentTexture get_texture(const std::string& id);
+        RenderAgentTexture* get_texture(const std::string& id);
         void drop_texture(const std::string& id);
+        RenderAgentTexture bake_texture(TextureConstructor* texture_constructors[], const int array_size, const bool force_file_loading=false);
 
         // Sprites
         bool add_sprite(const std::string& id, const std::string& texture_id, const int& x, const int& y, const int& width=-1, const int& height=-1);
         void render(bool clear_renderer=true);
-        RenderAgentTexture bake_texture(TextureConstructor* texture_constructors[], const int array_size, const bool force_file_loading=false);
 
         // Entitys
         bool add_entity(const std::string& id, const std::string& sprite_id, const int& x, const int& y, const int& size, const int& rotation=0);
-        bool update_entity(RenderAgentEntity update_entity);
-        RenderAgentEntity get_entity(const std::string& id);
+        RenderAgentEntity* get_entity(const std::string& id);
 };
 
 #endif

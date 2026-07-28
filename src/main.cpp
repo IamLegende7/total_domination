@@ -25,7 +25,7 @@ SDL_AppResult SDL_AppIterate(void* appState) {
     static int ms_per_tick = 1000 / SETTINGS["tick_rate"];
     static int ms_per_frame = 1000 / SETTINGS["max_frame_rate"];
     static int accumulator_tick = 0;
-    static int tick_count = 0; // Counting ticks / frames each second for FPS / tick rate calulations
+    static int tick_count = 0; // Counting ticks/frames each second for FPS/tick rate calulations
     static int frame_count = 0;
     static int elapsed_time_tick_rate = 0;
     static int elapsed_time_frame_rate = 0;
@@ -43,7 +43,7 @@ SDL_AppResult SDL_AppIterate(void* appState) {
     if (elapsed_time_tick_rate >= 1000) {
         ACTUAL_TICK_RATE = (tick_count*1000.0f / elapsed_time_tick_rate);
         LOG(LogLevel::DEBUG, "TPS is %d: %d*1000 / %d",
-            (int)(std::round(ACTUAL_TICK_RATE)),
+            (int)(std::round(ACTUAL_TICK_RATE-0.5)),
             tick_count,
             elapsed_time_tick_rate
         );
@@ -54,7 +54,7 @@ SDL_AppResult SDL_AppIterate(void* appState) {
     if (elapsed_time_frame_rate >= 1000) {
         ACTUAL_FRAME_RATE = (frame_count*1000.0f / elapsed_time_frame_rate);
         LOG(LogLevel::DEBUG, "FPS is %d: %d*1000 / %d",
-            (int)(std::round(ACTUAL_FRAME_RATE)),
+            (int)(std::round(ACTUAL_FRAME_RATE-0.5)),
             frame_count,
             elapsed_time_frame_rate
         );
@@ -82,7 +82,7 @@ SDL_AppResult SDL_AppIterate(void* appState) {
         tick_count++;
         accumulator_tick -= ms_per_tick;
         TICKS++;
-        if (TICKS > 20) TICKS = 0;
+        if (TICKS >= 20) TICKS = 0;
     }
 
     // Renderring
