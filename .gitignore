@@ -14,3 +14,6 @@ data/logs/current.log
 
 # dev
 .development
+
+# a 2000x2000 Map too large for github:
+resources/maps/testing/benchmark2.jsonc
