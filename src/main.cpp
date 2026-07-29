@@ -2,6 +2,7 @@
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
+#include <SDL3_shadercross/SDL_shadercross.h>
 
 #include <cmath>
 #include <string>
@@ -13,6 +14,7 @@
 #include "inputs.hpp"
 #include "renderring/render_agents.hpp"
 #include "renderring/textures.hpp"
+#include "renderring/shaders.hpp"
 #include "utils/logger.hpp"
 
 #include "settings/debug.hpp"
@@ -112,7 +114,20 @@ SDL_AppResult SDL_AppEvent(void* appState, SDL_Event* event) {
     if (event->type == SDL_EVENT_WINDOW_RESIZED) {
         SCREEN_WIDTH = event->window.data1;
         SCREEN_HEIGHT = event->window.data2;
-        if (int(RENDER_SETTINGS["render_mode"]) == 1) SDL_SetRenderViewport(RENDERER, NULL);
+        if (int(RENDER_SETTINGS["render_mode"]) == 1)
+            SDL_SetRenderViewport(RENDERER, NULL);
+
+        if (CURRENT_RENDER_STATE == 1) {
+            CRTEffectUniforms uniforms;
+            SDL_zero(uniforms);
+            LOG(LogLevel::DEBUG, "Width: %d, Height: %d", SCREEN_WIDTH, SCREEN_HEIGHT);
+            uniforms.texture_width = SCREEN_WIDTH;
+            uniforms.texture_height = SCREEN_HEIGHT;
+            if (!SDL_SetGPURenderStateFragmentUniforms(RENDER_STATES[CURRENT_RENDER_STATE].state, 0, &uniforms, sizeof(uniforms))) {
+                SDL_Log("Couldn't set uniform data: %s", SDL_GetError());
+                CURRENT_RENDER_STATE = 0;
+            }
+        }
         DIRTY_SCREEN = true;
     }
     INPUTS->update(event);

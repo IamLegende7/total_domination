@@ -3,6 +3,7 @@
 #include <SDL3/SDL_messagebox.h>
 #include <SDL3_image/SDL_image.h>
 #include <SDL3_ttf/SDL_ttf.h>
+#include <SDL3_shadercross/SDL_shadercross.h>
 
 #include <string>
 
@@ -20,6 +21,7 @@
 #include "settings/debug.hpp"
 #include "settings/main.hpp"
 #include "settings/render.hpp"
+#include "renderring/shaders.hpp"
 
 bool load_settings() {
     init_locations_settings("data/config/locations.ini"); /* Not really ideal */
@@ -60,6 +62,19 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
         STATUS_TTF_LOADED = false;
     }
 
+    // SDL_shadercross init //
+    if (RENDER_SETTINGS["online_shaders"]) {
+        LOG(LogLevel::INFO, "Initializing SDL_shadercross..");
+        if (!SDL_ShaderCross_Init()) {
+            LOG(LogLevel::ERROR, "SDL_ShaderCross_Init failed: %s", SDL_GetError());
+            LOG(LogLevel::WARNING, "Online shader compilation disabled.");
+            STATUS_SHADERCROSS_LOADED = false;
+        } else {
+            STATUS_SHADERCROSS_LOADED = true;
+        }
+    }
+
+
     // WINDOW //
     std::string windowTitle = INFO_NAME + " - " + INFO_VERSION.toString();
     WINDOW = SDL_CreateWindow(windowTitle.c_str(), SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_RESIZABLE);
@@ -75,9 +90,9 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
 
     if (int(RENDER_SETTINGS["render_mode"]) == 1) {
         // RENDERER //
-        RENDERER = SDL_CreateRenderer(WINDOW, NULL);
+        RENDERER = SDL_CreateRenderer(WINDOW, SDL_GPU_RENDERER);
         if (RENDERER == NULL) {
-            LOG(LogLevel::ERROR, "Renderrer could not be created: %s", SDL_GetError());
+            LOG(LogLevel::ERROR, "Renderer could not be created: %s", SDL_GetError());
             LOG(LogLevel::WARNING, "Falling back to software renderer..");
             STATUS_FORCED_RENDERMODE = 2;
             RENDER_SETTINGS["render_mode"].set(2);
@@ -110,7 +125,13 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
     // Inputs //
     INPUTS = new InputHandler();
 
-
+    // Shader loading //
+    // TODO: make work with multiple loaded shaders (but only one selected)
+    CURRENT_RENDER_STATE = (int)DEBUG["select_render_state"]; // tmp fix
+    if (!add_renderer_shader_state(RENDERER, RENDER_SETTINGS["shader"].get_str(),  RENDER_STATES)) {
+        LOG(LogLevel::WARNING, "Failed to setup shader state.");
+        CURRENT_RENDER_STATE = 0;
+    }
 
     LOG(LogLevel::INFO, "Setup all done!");
 
@@ -133,7 +154,6 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
     LOG(LogLevel::INFO, "All good; have fun!");
     return SDL_APP_CONTINUE;
 }
-
 
 
 
@@ -190,7 +210,12 @@ void quit(void *appstate, SDL_AppResult result) {
         SDL_DestroyWindow(WINDOW);
     }
 
-    TTF_Quit();
+    if (STATUS_SHADERCROSS_LOADED) {
+        SDL_ShaderCross_Quit();
+    }
+    if (STATUS_TTF_LOADED) {
+        TTF_Quit();
+    }
     SDL_Quit();
 }
 

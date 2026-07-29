@@ -143,6 +143,8 @@ fi
 cmake -B build
 cmake --build build #--config Release
 
+cp -v ./build/lib/SDL_shadercross/external/DirectXShaderCompiler/lib/libdxcompiler.so* ./bin/lib/
+
 cp resources/build/run.sh bin/
 cp resources/build/package.sh bin/
 cp resources/build/RELEASE_README.md bin/README.md

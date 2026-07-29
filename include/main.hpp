@@ -2,11 +2,14 @@
 #define SETUP_HPP
 
 #include <SDL3/SDL.h>
+#include <vector>
+#include "renderring/shaders.hpp"
 
 // Windows, Renderer & GPU devices //
 inline SDL_Window* WINDOW = nullptr;
 inline SDL_Renderer* RENDERER = nullptr;
-inline SDL_GPUDevice* GPU = nullptr;
+inline std::vector<RenderState> RENDER_STATES = {RenderState{}};
+inline int CURRENT_RENDER_STATE = 0;
 
 // The how manyth tick in a second we are on right now
 inline Uint8 TICKS = 0;

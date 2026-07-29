@@ -11,6 +11,7 @@ total_domination-windows.zip
 # Logs
 data/logs/crashes/*
 data/logs/current.log
+data/logs/atlas-*.png
 
 # dev
 .development

@@ -17,8 +17,8 @@ add_executable(Total_Domination ${SOURCES})
 set(LIBRARY_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/bin/lib)
 set(LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin/lib)
 
-set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
-set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+#set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+#set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 
 target_include_directories(Total_Domination PRIVATE 
     include 
@@ -28,18 +28,29 @@ target_include_directories(Total_Domination PRIVATE
 )
 
 
+### Settings ###
+set(SDLSHADERCROSS_VENDORED ON CACHE BOOL "" FORCE)
+
 ### Librarys ###
+set_target_properties(Total_Domination PROPERTIES
+    BUILD_RPATH "$ORIGIN/lib"
+    INSTALL_RPATH "$ORIGIN/lib"
+)
+
 add_subdirectory(lib/SDL EXCLUDE_FROM_ALL)
 add_subdirectory(lib/SDL_image EXCLUDE_FROM_ALL)
 add_subdirectory(lib/SDL_ttf EXCLUDE_FROM_ALL)
 add_subdirectory(lib/simpleini)
+add_subdirectory(lib/SDL_shadercross)
 
 # Link Librarys
+#find_package(SDL3_shadercross REQUIRED CONFIG)
 target_link_libraries(Total_Domination PRIVATE 
                       SDL3::SDL3
                       SDL3_image::SDL3_image
                       SDL3_ttf::SDL3_ttf
                       SimpleIni::SimpleIni
+                      SDL3_shadercross::SDL3_shadercross # TODO: Make optional
                     )
 
 

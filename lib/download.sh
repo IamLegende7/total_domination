@@ -21,3 +21,5 @@ while true; do
         fi
     fi
 done
+
+sh lib/SDL_shadercross/external/download.sh

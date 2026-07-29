@@ -19,20 +19,22 @@
 #include "settings/debug.hpp"
 
 struct RenderAgentTexture {
-    SDL_Texture* texture;
-    int width, height;
+    private:
+        SDL_Texture* texture;
+    public:
+        int width, height;
 
-    RenderAgentTexture()
-        : texture(static_cast<SDL_Texture*>(nullptr)), width(0), height(0) {};
-    RenderAgentTexture(SDL_Texture* texture, int width, int height)
-        : texture(texture), width(width), height(height) {};
-    void cleanup() {
-        SDL_DestroyTexture(texture);
-    };
+        RenderAgentTexture()
+            : texture(static_cast<SDL_Texture*>(nullptr)), width(0), height(0) {};
+        RenderAgentTexture(SDL_Texture* texture, int width, int height)
+            : texture(texture), width(width), height(height) {};
+        void cleanup() {
+            SDL_DestroyTexture(texture);
+        };
 
-    SDL_Texture* get_texture() {
-        return texture;
-    };
+        SDL_Texture* get_texture() {
+            return texture;
+        };
 };
 
 struct RenderAgentSprite {
@@ -40,11 +42,13 @@ struct RenderAgentSprite {
     SDL_FRect texture_rect = {0, 0, 32, 32};
 
     RenderAgentSprite()
-        : texture("atlas_interface"), texture_rect({0, 0, 16, 16}) {};
-    RenderAgentSprite(const std::string texture, const SDL_FRect texture_rect)
-        : texture(texture), texture_rect(texture_rect) {};
-    RenderAgentSprite(const RenderAgentSprite& other)
-    : texture(other.texture), texture_rect(other.texture_rect) {}
+        : texture("atlas_interface"), texture_rect({0, 0, 16, 16}) {}
+
+    RenderAgentSprite(std::string texture, SDL_FRect texture_rect)
+        : texture(std::move(texture)), texture_rect(texture_rect) {}
+
+    RenderAgentSprite(const RenderAgentSprite& other) = default;
+    RenderAgentSprite& operator=(const RenderAgentSprite& other) = default;
 };
 
 struct RenderAgentEntity {
@@ -78,14 +82,15 @@ class RenderAgent {
         std::unordered_map<std::string, RenderAgentTexture> agent_textures;
         std::unordered_map<std::string, RenderAgentSprite> agent_sprites;
         std::vector<RenderAgentEntity> agent_entitys;
+        SDL_Texture* target; // Render to this texture first before writing that to the screen
         
     public:
-        RenderAgent(SDL_Window* window = WINDOW);
-        //~RenderAgent();
+        RenderAgent();
+        ~RenderAgent() {};
 
         // Textures
         bool add_texture(const std::string& id, const std::string& texture_path);
-        RenderAgentTexture load_texture(const std::string& id, const std::string& texture_path);
+        RenderAgentTexture load_texture(const std::string& texture_path);
         bool insert_texture(const std::string& id, RenderAgentTexture texture);
         bool texture_exists(const std::string& id);
         RenderAgentTexture* get_texture(const std::string& id);

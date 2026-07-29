@@ -52,7 +52,7 @@ bool bake_atlas(RenderAgent* agent, const std::string& atlas_name, const std::st
         if (DEBUG["all_debug_logs"]) LOG(LogLevel::DEBUG, "current_texture_path: %s", current_texture_path.c_str());
         RenderAgentTexture current_texture;
         if (agent->texture_exists(current_texture_name) & !force_file_loading) current_texture = *agent->get_texture(current_texture_name);
-        else                                                                   current_texture = agent->load_texture(current_texture_name, current_texture_path);
+        else                                                                   current_texture = agent->load_texture(current_texture_path);
 
         found_pos = false;
         int current_row = 0;

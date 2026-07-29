@@ -1,18 +1,11 @@
 #include "renderring/render_agent.hpp"
+#include "renderring/shaders.hpp"
 
-// A lot of the basics of SDL3_GPU taken from https://glusoft.com/sdl3-tutorials/display-texture-sdl3_gpu/ and https://glusoft.com/sdl3-tutorials/sprite-batching-sdl3-gpu/
+RenderAgent::RenderAgent() {
+    target = SDL_CreateTexture(RENDERER, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, SCREEN_WIDTH, SCREEN_HEIGHT);
+}
 
-struct SpriteInstance {
-    float x, y, z;
-    float rotation;
-    float w, h, padding_a, padding_b;
-    float tex_u, tex_v, tex_w, tex_h;
-    float r, g, b, a;
-};
-
-RenderAgent::RenderAgent(SDL_Window* window) {};
-
-RenderAgentTexture RenderAgent::load_texture(const std::string& id, const std::string& texture_path) {
+RenderAgentTexture RenderAgent::load_texture(const std::string& texture_path) {
     if (DEBUG["all_debug_logs"]) LOG(LogLevel::DEBUG, "Loading Texture %s", texture_path.c_str());
     SDL_Surface* image_surface = IMG_Load(texture_path.c_str());
     if (image_surface == NULL) {
@@ -36,7 +29,7 @@ RenderAgentTexture RenderAgent::load_texture(const std::string& id, const std::s
 
 
     return RenderAgentTexture();
-};
+}
 
 bool RenderAgent::insert_texture(const std::string& id, RenderAgentTexture texture) {
     agent_textures[id] = texture;
@@ -59,7 +52,7 @@ RenderAgentTexture* RenderAgent::get_texture(const std::string& id) {
 }
 
 bool RenderAgent::add_texture(const std::string& id, const std::string& texture_path) {
-    return insert_texture(id, load_texture(id, texture_path));
+    return insert_texture(id, load_texture(texture_path));
 };
 
 bool RenderAgent::add_sprite(const std::string& id, const std::string& texture_id, const int& x, const int& y, const int& width, const int& height) {
@@ -83,6 +76,12 @@ bool RenderAgent::add_entity(const std::string& id, const std::string& sprite_id
 void RenderAgent::render(bool clear_renderer) {
     //LOG(LogLevel::DEBUG, "Starting Renderpass");
     if (int(RENDER_SETTINGS["render_mode"]) == 1) {
+        // Set target
+        if ((target->w != SCREEN_WIDTH) || (target->h != SCREEN_HEIGHT)) {
+            target = SDL_CreateTexture(RENDERER, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, SCREEN_WIDTH, SCREEN_HEIGHT);
+        }
+        SDL_SetRenderTarget(RENDERER, target);
+
         if (clear_renderer) {
             SDL_SetRenderDrawColor(RENDERER, 26, 26, 26, 255);
             SDL_RenderClear(RENDERER);
@@ -90,10 +89,10 @@ void RenderAgent::render(bool clear_renderer) {
 
         for (const RenderAgentEntity& entity : agent_entitys) {
             if (
-                ((entity.x-CAMERA.x)*CAMERA.zoom > -500) &&
-                ((entity.x-CAMERA.x)*CAMERA.zoom < SCREEN_WIDTH+500) &&
-                ((entity.y-CAMERA.y)*CAMERA.zoom > -500) &&
-                ((entity.y-CAMERA.y)*CAMERA.zoom < SCREEN_HEIGHT+500)
+                ((entity.x-CAMERA.x)*CAMERA.zoom > SCREEN_WIDTH*-0.5) &&
+                ((entity.x-CAMERA.x)*CAMERA.zoom < SCREEN_WIDTH*1.5) &&
+                ((entity.y-CAMERA.y)*CAMERA.zoom > SCREEN_HEIGHT*-0.5) &&
+                ((entity.y-CAMERA.y)*CAMERA.zoom < SCREEN_HEIGHT*1.5)
             ) {
                 if (DEBUG["all_debug_logs"]) LOG(LogLevel::DEBUG, "Renderring Entity %s at %d;%d", entity.name.c_str(), (entity.x-CAMERA.x)*CAMERA.zoom, (entity.y-CAMERA.y)*CAMERA.zoom);
                 // Sprite
@@ -127,6 +126,12 @@ void RenderAgent::render(bool clear_renderer) {
                 }
             }
         }
+        SDL_SetRenderTarget(RENDERER, NULL);
+
+        RenderState* current_state = &RENDER_STATES[CURRENT_RENDER_STATE];
+        SDL_SetGPURenderState(RENDERER, current_state->state);
+        SDL_RenderTexture(RENDERER, target, NULL, NULL);
+        SDL_SetGPURenderState(RENDERER, NULL);
 
         SDL_RenderPresent(RENDERER);
 
@@ -143,7 +148,7 @@ RenderAgentTexture RenderAgent::bake_texture(TextureConstructor* texture_constru
     for (int i = 0; i < array_size; ++i) {
         TextureConstructor* constructor = texture_constructors[i];
         if (texture_exists(constructor->name) & !force_file_loading) constructor->texture = &(agent_textures[constructor->name]);
-        else                                                         constructor->texture = new RenderAgentTexture(load_texture(constructor->file, constructor->file));
+        else                                                         constructor->texture = new RenderAgentTexture(load_texture(constructor->file));
         surface_width = std::max(surface_width, (constructor->texture->width+constructor->x)*constructor->size);
         surface_height = std::max(surface_height, (constructor->texture->height+constructor->y)*constructor->size);
     }
