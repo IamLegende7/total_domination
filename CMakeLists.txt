@@ -44,13 +44,12 @@ add_subdirectory(lib/simpleini)
 add_subdirectory(lib/SDL_shadercross)
 
 # Link Librarys
-#find_package(SDL3_shadercross REQUIRED CONFIG)
 target_link_libraries(Total_Domination PRIVATE 
                       SDL3::SDL3
                       SDL3_image::SDL3_image
                       SDL3_ttf::SDL3_ttf
                       SimpleIni::SimpleIni
-                      SDL3_shadercross::SDL3_shadercross # TODO: Make optional
+                      SDL3_shadercross::SDL3_shadercross
                     )
 
 

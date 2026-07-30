@@ -102,7 +102,8 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
         if (!SDL_SetRenderVSync(RENDERER, 1)) {
             LOG(LogLevel::ERROR, "VSync could not be enabled: %s", SDL_GetError());
         }
-    } else if (int(RENDER_SETTINGS["render_mode"]) == 2) { // TODO
+    }
+    if (int(RENDER_SETTINGS["render_mode"]) == 2) { // TODO
         LOG(LogLevel::CRITICAL, "Software Renderer not implemented!");
         return SDL_APP_FAILURE;
     }
@@ -126,12 +127,7 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
     INPUTS = new InputHandler();
 
     // Shader loading //
-    // TODO: make work with multiple loaded shaders (but only one selected)
-    CURRENT_RENDER_STATE = (int)DEBUG["select_render_state"]; // tmp fix
-    if (!add_renderer_shader_state(RENDERER, RENDER_SETTINGS["shader"].get_str(),  RENDER_STATES)) {
-        LOG(LogLevel::WARNING, "Failed to setup shader state.");
-        CURRENT_RENDER_STATE = 0;
-    }
+    CURRENT_RENDER_STATE = set_render_state(RENDERER, RENDER_SETTINGS["shader"].get_str(), RENDER_STATES);
 
     LOG(LogLevel::INFO, "Setup all done!");
 

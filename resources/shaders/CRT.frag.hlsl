@@ -1,4 +1,5 @@
 // Copied from SDL3/tests (and edited)
+// TODO: make the scanlines depend on the games pixel size (~ZOOM)
 
 // This shader is adapted from the Lightweight CRT Effect at:
 // https://godotshaders.com/shader/lightweight-crt-effect/

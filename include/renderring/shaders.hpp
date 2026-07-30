@@ -17,6 +17,8 @@ struct RenderState {
 };
 
 SDL_GPUShader* load_shader(SDL_GPUDevice *device, const std::string& filename, SDL_ShaderCross_ShaderStage stage);
-bool add_renderer_shader_state(SDL_Renderer* renderer, const std::string& filename,  std::vector<RenderState>& out_render_states);
+bool add_renderer_render_state(SDL_Renderer* renderer, const std::string& filename,  std::vector<RenderState>& render_states);
+int get_render_state(const std::vector<RenderState>& render_states, const std::string& name);
+int set_render_state(SDL_Renderer* renderer, const std::string& filename, std::vector<RenderState>& render_states); // this is the one you should use outside of shaders.cpp, usually
 
 #endif

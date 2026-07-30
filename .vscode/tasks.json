@@ -38,7 +38,7 @@
         {
             "label": "compile [shaders]",
             "type": "shell",
-            "command": "bash build.sh -d --shadercross --offline-shaders --no-show-warning",
+            "command": "bash build.sh -d --offline-shaders --no-show-warning",
             "group": {
                 "kind": "build",
                 "isDefault": true

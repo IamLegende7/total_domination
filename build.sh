@@ -9,11 +9,10 @@ auto_package=false
 install_build_dependencies=true
 do_cleanup=false
 show_warning=true
-compile_shadercross=false
 compile_shaders=false
 download_submodules=false
 
-OPTIONS=$(getopt -o c,p,d,h,s --long clean,auto-package,no-install-deps,cleanup,help,no-show-warning,shadercross,offline-shaders,download -- "$@")
+OPTIONS=$(getopt -o c,p,d,h,s --long clean,auto-package,no-install-deps,cleanup,help,no-show-warning,offline-shaders,download -- "$@")
 eval set -- "$OPTIONS"
 while true; do
   case "$1" in
@@ -37,10 +36,6 @@ while true; do
       show_warning=false
       shift
       ;;
-    --shadercross)
-      compile_shadercross=true
-      shift
-      ;;
     -s|--offline-shaders)
       compile_shaders=true
       shift
@@ -61,7 +56,6 @@ while true; do
       echo "[-d|--no-install-deps] Don't install dependencies automatically"
       echo "[--cleanup]            Cleanup build files"
       echo "[--no-show-warning]    Don't show the 'Has only been tested on arch' warning"
-      echo "[--shadercross]        Compile SDL_shadercross. Drasticly increases the compile times, but the shadercross will need to be compiled at least once for SDL_gpu to work (render mode 0)"
       echo "[-s|--offline-shaders] Precompile shaders"
       echo "[--download]           Run lib/download.sh before building. Omit if you used 'git clone --recursive' or manually ran lib/download.sh."
       exit 1
@@ -124,26 +118,12 @@ mkdir -p bin
 mkdir -p bin/lib
 mkdir -p build
 
-## SDL_Shadercross ##
-if [ "$compile_shadercross" = true ]; then
-    if [ "$do_clean_build" = true ]; then
-        if [ "$(ls -A build/shader_build)" ]; then
-            rm -r build/shader_build
-        fi
-    fi
-    mkdir -p build/shader_build
-
-    pushd lib/SDL_shadercross
-    cmake -B ../../build/shader_build -DSDLSHADERCROSS_VENDORED=ON
-    cmake --build ../../build/shader_build
-    popd
-fi
-
 ## Build ##
 cmake -B build
 cmake --build build #--config Release
 
-cp -v ./build/lib/SDL_shadercross/external/DirectXShaderCompiler/lib/libdxcompiler.so* ./bin/lib/
+cp ./build/lib/SDL_shadercross/external/DirectXShaderCompiler/lib/libdxcompiler.so* ./bin/lib/
+cp build/lib/SDL_shadercross/shadercross bin/
 
 cp resources/build/run.sh bin/
 cp resources/build/package.sh bin/
@@ -164,14 +144,16 @@ if [ "$compile_shaders" = true ]; then
     mkdir -p bin/shaders/SPIRV
     mkdir -p bin/shaders/MSL
     mkdir -p bin/shaders/DXIL
+    mkdir -p bin/shaders/reflection_info
     pushd resources/shaders
-    if [ -f "../../build/shader_build/shadercross" ]; then
+    if [ -f "../../bin/shadercross" ]; then
         for filename in *.hlsl; do
             if [ -f "$filename" ]; then
                 echo "Compiling $filename..."
-                ../../build/shader_build/shadercross "$filename" -o "../../bin/shaders/SPIRV/${filename/.hlsl/.spv}"
-                ../../build/shader_build/shadercross "$filename" -o "../../bin/shaders/MSL/${filename/.hlsl/.msl}"
-                ../../build/shader_build/shadercross "$filename" -o "../../bin/shaders/DXIL/${filename/.hlsl/.dxil}"
+                ./../../bin/shadercross "$filename" -o "../../bin/shaders/SPIRV/${filename/.hlsl/.spv}"
+                ./../../bin/shadercross "$filename" -o "../../bin/shaders/MSL/${filename/.hlsl/.msl}"
+                ./../../bin/shadercross "$filename" -o "../../bin/shaders/DXIL/${filename/.hlsl/.dxil}"
+                ./../../bin/shadercross "$filename" -o "../../bin/shaders/reflection_info/${filename/.hlsl/.json}"
             fi
         done
     else

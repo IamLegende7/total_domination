@@ -2,12 +2,42 @@
 #include <SDL3_shadercross/SDL_shadercross.h>
 #include <string>
 #include <vector>
+#include <tuple>
+#include <filesystem>
+#include "rapidjson/document.h"
+
 #include "renderring/shaders.hpp"
 #include "settings/render.hpp"
 #include "status.hpp"
 #include "main.hpp"
+#include "utils/json.hpp"
 
-SDL_GPUShader* load_shader(SDL_GPUDevice *device, const std::string& filename, SDL_ShaderCross_ShaderStage stage) { // TODO: more error logging // TODO: add DXIL & MSL support depending on device support
+// Local
+std::tuple<std::string, std::string> get_compiled_path(const std::string& hlsl_path, const SDL_GPUShaderFormat format) {
+    const std::string initial_suffix = ".hlsl";
+    std::string compiled_suffix;
+    std::string compiled_dir;
+    if (format == SDL_GPU_SHADERFORMAT_SPIRV) {
+        compiled_suffix = ".spv";
+        compiled_dir = "SPIRV";
+    } else if (format == SDL_GPU_SHADERFORMAT_DXIL) {
+        compiled_suffix = ".dxil";
+        compiled_dir = "DXIL";
+    } else if (format == SDL_GPU_SHADERFORMAT_MSL) {
+        compiled_suffix = ".msl";
+        compiled_dir = "MSL";
+    }
+
+    std::filesystem::path p(hlsl_path);
+    if (p.extension() != ".hlsl") {
+        LOG(LogLevel::WARNING, "Path \"%s\" does not point to a .hlsl file.", hlsl_path.c_str());
+        return {"", ""};
+    }
+    std::string base = p.stem().string();
+    return {"bin/shaders/"+compiled_dir+"/"+base+compiled_suffix, "bin/shaders/reflection_info/"+base+".json"};
+}
+
+SDL_GPUShader* load_shader(SDL_GPUDevice *device, const std::string& filename, SDL_ShaderCross_ShaderStage stage) {
     LOG(LogLevel::INFO, "Loading shader \"%s\"..", filename.c_str());
     SDL_GPUShader* shader;
     if (RENDER_SETTINGS["online_shaders"]) { 
@@ -34,13 +64,14 @@ SDL_GPUShader* load_shader(SDL_GPUDevice *device, const std::string& filename, S
         void *spirv = SDL_ShaderCross_CompileSPIRVFromHLSL(&hlsl_info, &spirv_size);
         SDL_free(source);
         if (!spirv) {
-            SDL_Log("CompileSPIRVFromHLSL failed: %s", SDL_GetError());
+            LOG(LogLevel::ERROR, "Compiling SPIRV from HLSL failed: %s", SDL_GetError());
             return nullptr;
         }
     
         // 2: reflect to get resource_info
         SDL_ShaderCross_GraphicsShaderMetadata *metadata = SDL_ShaderCross_ReflectGraphicsSPIRV((Uint8 *)spirv, spirv_size, 0);
         if (!metadata) {
+            LOG(LogLevel::ERROR, "Failed to reflect SPIRV shader: %s", SDL_GetError());
             SDL_free(spirv);
             return nullptr;
         }
@@ -59,33 +90,73 @@ SDL_GPUShader* load_shader(SDL_GPUDevice *device, const std::string& filename, S
         SDL_free(spirv);
 
     } else {
-        LOG(LogLevel::WARNING, "Offline shader loading not yet implemented!");
-        return nullptr;
+        SDL_GPUShaderCreateInfo info;
+        SDL_zero(info);
+        info.entrypoint = "main";
+        info.stage = (SDL_GPUShaderStage)stage;
+        
+        
+        SDL_GPUShaderFormat formats = SDL_GetGPUShaderFormats(device);
+        if (formats == SDL_GPU_SHADERFORMAT_INVALID) {
+            LOG(LogLevel::ERROR, "Couldn't get supported shader formats: %s", SDL_GetError());
+            return nullptr;
+        }
+        if (formats & SDL_GPU_SHADERFORMAT_SPIRV) {
+            info.format = SDL_GPU_SHADERFORMAT_SPIRV;
+        } else if (formats & SDL_GPU_SHADERFORMAT_DXIL) {
+            info.format = SDL_GPU_SHADERFORMAT_DXIL;
+        } else if (formats & SDL_GPU_SHADERFORMAT_MSL) {
+            info.format = SDL_GPU_SHADERFORMAT_MSL;
+        } else {
+            LOG(LogLevel::ERROR, "No supported shader format found");
+            return nullptr;
+        }
+        auto [compiled_shader_file, reflection_info_file] = get_compiled_path(filename, info.format);
+
+        size_t size = 0;
+        void *code = SDL_LoadFile(compiled_shader_file.c_str(), &size);
+        if (!code) {
+            LOG(LogLevel::ERROR, "Could not load compiled shader from file \"%s\": %s", compiled_shader_file.c_str(), SDL_GetError());
+            return nullptr;
+        }
+        info.code = (const Uint8 *)code;
+        info.code_size = size;
+
+        rapidjson::Document reflection_info_json = open_json(reflection_info_file);
+        if (!reflection_info_json.HasMember("samplers") || !reflection_info_json.HasMember("uniform_buffers")) {
+            LOG(LogLevel::ERROR, "Reflection info file \"%s\" holds invalid data: member \"samplers\" and/or \"uniform_buffers\" is missing.", compiled_shader_file.c_str());
+            return nullptr;
+        }
+        info.num_samplers = reflection_info_json["samplers"].GetInt();
+        info.num_uniform_buffers = reflection_info_json["uniform_buffers"].GetInt();
+
+        shader = SDL_CreateGPUShader(device, &info);
+        SDL_free(code);
     }
     return shader;
 }
 
-bool add_renderer_shader_state(SDL_Renderer* renderer, const std::string& filename,  std::vector<RenderState>& out_render_states) {
+bool add_renderer_render_state(SDL_Renderer* renderer, const std::string& filename,  std::vector<RenderState>& render_states) {
     SDL_GPUDevice* device = SDL_GetGPURendererDevice(renderer);
     if (!device) { // TODO: Better logging
-        SDL_Log("Couldn't get GPU device: %s", SDL_GetError());
+        LOG(LogLevel::ERROR, "Couldn't get GPU device: %s", SDL_GetError());
         return false;
     }
 
-    out_render_states.push_back(RenderState());
-    out_render_states.back().name = filename;
-    out_render_states.back().shader = load_shader(device, filename, SDL_SHADERCROSS_SHADERSTAGE_FRAGMENT);
-    if (out_render_states.back().shader == nullptr) {
-        SDL_Log("Couldn't create shader: %s", SDL_GetError());
+    render_states.push_back(RenderState());
+    render_states.back().name = filename;
+    render_states.back().shader = load_shader(device, filename, SDL_SHADERCROSS_SHADERSTAGE_FRAGMENT);
+    if (render_states.back().shader == nullptr) {
+        LOG(LogLevel::WARNING, "Couldn't create shader: %s", SDL_GetError());
         return false;
     }
 
     SDL_GPURenderStateCreateInfo createinfo;
     SDL_zero(createinfo);
-    createinfo.fragment_shader = out_render_states.back().shader;
-    out_render_states.back().state = SDL_CreateGPURenderState(renderer, &createinfo);
-    if (!out_render_states.back().state) {
-        SDL_Log("Couldn't create render state: %s", SDL_GetError());
+    createinfo.fragment_shader = render_states.back().shader;
+    render_states.back().state = SDL_CreateGPURenderState(renderer, &createinfo);
+    if (!render_states.back().state) {
+        LOG(LogLevel::WARNING, "Couldn't create render state: %s", SDL_GetError());
         return false;
     }
 
@@ -94,10 +165,39 @@ bool add_renderer_shader_state(SDL_Renderer* renderer, const std::string& filena
         SDL_zero(uniforms);
         uniforms.texture_width = SCREEN_WIDTH;
         uniforms.texture_height = SCREEN_HEIGHT;
-        if (!SDL_SetGPURenderStateFragmentUniforms(out_render_states.back().state, 0, &uniforms, sizeof(uniforms))) {
-            SDL_Log("Couldn't set uniform data: %s", SDL_GetError());
+        if (!SDL_SetGPURenderStateFragmentUniforms(render_states.back().state, 0, &uniforms, sizeof(uniforms))) {
+            LOG(LogLevel::ERROR, "Couldn't set uniform data: %s", SDL_GetError());
             return false;
         }
     }
     return true;
+}
+
+int get_render_state(const std::vector<RenderState>& render_states, const std::string& name) {
+    int i = 0;
+    for (const RenderState& state : render_states) {
+        if (state.name == name) {
+            return i;
+        }
+        i++;
+    }
+    return -1;
+}
+
+int set_render_state(SDL_Renderer* renderer, const std::string& filename, std::vector<RenderState>& render_states) {
+    if (filename == "none") {
+        return 0;
+    }
+    const int existing_shader_state_index = get_render_state(render_states, filename);
+    if (existing_shader_state_index != -1) {
+        //LOG(LogLevel::WARNING, "Tried to add render state \"%s\" but it already exists.", filename);
+        return existing_shader_state_index;
+    }
+
+    if (!add_renderer_render_state(renderer, filename, render_states)) {
+        LOG(LogLevel::WARNING, "Failed to setup render state.");
+        return 0;
+    }
+
+    return render_states.size()-1;
 }
