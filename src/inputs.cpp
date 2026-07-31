@@ -16,6 +16,8 @@
 
 #include "inputs.hpp"
 
+#include "renderring/render_agents.hpp"
+
 
 // Reloading settings
 #include "callback_functions.hpp"
@@ -63,19 +65,19 @@ bool InputHandler::process_game_keyboard() {
     // Camera
     if (keyboard_state[SDL_SCANCODE_LEFT] != 0) {
         CAMERA.x -= SETTINGS["camera_speed"];
-        DIRTY_SCREEN = true;
+        MAIN_RENDER_AGENT->dirty = true;
     }
     if (keyboard_state[SDL_SCANCODE_RIGHT] != 0) {
         CAMERA.x += SETTINGS["camera_speed"];
-        DIRTY_SCREEN = true;
+        MAIN_RENDER_AGENT->dirty = true;
     }
     if (keyboard_state[SDL_SCANCODE_UP] != 0) {
         CAMERA.y -= SETTINGS["camera_speed"];
-        DIRTY_SCREEN = true;
+        MAIN_RENDER_AGENT->dirty = true;
     }
     if (keyboard_state[SDL_SCANCODE_DOWN] != 0) {
         CAMERA.y += SETTINGS["camera_speed"];
-        DIRTY_SCREEN = true;
+        MAIN_RENDER_AGENT->dirty = true;
     }
 
     return true;

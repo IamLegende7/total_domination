@@ -16,8 +16,6 @@ inline Uint8 TICKS = 0;
 inline float ACTUAL_FRAME_RATE = 0;
 inline float ACTUAL_TICK_RATE = 0;
 
-inline bool DIRTY_SCREEN = true;
-
 // 0: main menu; 1: in-game, payer turn; 2: enemy turn; 3: pause menu
 inline int MODE = 0;
 inline bool PAUSE = false; // TODO: implement
@@ -33,5 +31,8 @@ struct Camera {
 };
 
 inline Camera CAMERA = Camera(-100, -100, 1);
+
+// UI //
+inline int UI_ZOOM = 4;
 
 #endif

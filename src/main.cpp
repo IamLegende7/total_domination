@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <SDL3_shadercross/SDL_shadercross.h>
+#include <SDL3_ttf/SDL_ttf.h>
 
 #include <cmath>
 #include <string>
@@ -43,23 +44,35 @@ SDL_AppResult SDL_AppIterate(void* appState) {
     elapsed_time_frame_rate += delta_time;
 
     if (elapsed_time_tick_rate >= 1000) {
+        int last_tick_rate = ACTUAL_TICK_RATE;
         ACTUAL_TICK_RATE = (tick_count*1000.0f / elapsed_time_tick_rate);
-        LOG(LogLevel::DEBUG, "TPS is %d: %d*1000 / %d",
-            (int)(std::round(ACTUAL_TICK_RATE-0.5)),
-            tick_count,
-            elapsed_time_tick_rate
-        );
+        //LOG(LogLevel::DEBUG, "TPS is %d: %d*1000 / %d",
+        //    (int)(std::round(ACTUAL_TICK_RATE-0.5)), tick_count, elapsed_time_tick_rate);
+        if (DEBUG["show_tps"]) {
+            if (last_tick_rate != ACTUAL_TICK_RATE) {
+                Text* tps_text = UI_RENDER_AGENT->get_text("TPS");
+                if (tps_text != nullptr)
+                    TTF_SetTextString(tps_text->text, ("TPS: "+std::to_string((int)(std::round(ACTUAL_TICK_RATE-0.5)))).c_str(), 0);
+                UI_RENDER_AGENT->dirty = true;
+            }
+        }
         tick_count = 0;
         elapsed_time_tick_rate = 0;
     }
 
     if (elapsed_time_frame_rate >= 1000) {
+        int last_frame_rate = ACTUAL_FRAME_RATE;
         ACTUAL_FRAME_RATE = (frame_count*1000.0f / elapsed_time_frame_rate);
-        LOG(LogLevel::DEBUG, "FPS is %d: %d*1000 / %d",
-            (int)(std::round(ACTUAL_FRAME_RATE-0.5)),
-            frame_count,
-            elapsed_time_frame_rate
-        );
+        //LOG(LogLevel::DEBUG, "FPS is %d: %d*1000 / %d",
+        //    (int)(std::round(ACTUAL_FRAME_RATE-0.5)), frame_count, elapsed_time_frame_rate);
+        if (DEBUG["show_fps"]) {
+            if (last_frame_rate != ACTUAL_FRAME_RATE) {
+                Text* fps_text = UI_RENDER_AGENT->get_text("FPS");
+                if (fps_text != nullptr)
+                    TTF_SetTextString(fps_text->text, ("FPS: "+std::to_string((int)(std::round(ACTUAL_FRAME_RATE-0.5)))).c_str(), 0);
+                UI_RENDER_AGENT->dirty = true;
+            }
+        }
         frame_count = 0;
         elapsed_time_frame_rate = 0;
     }
@@ -91,10 +104,17 @@ SDL_AppResult SDL_AppIterate(void* appState) {
     if (MODE == 0) {
 
     } else if (MODE == 1) {
-        if (DIRTY_SCREEN) {
-            MAIN_RENDER_AGENT->render();
-            DIRTY_SCREEN = false;
+        bool changed_main;
+        bool changed_ui;
+        changed_main = MAIN_RENDER_AGENT->render(true);
+        changed_ui = UI_RENDER_AGENT->render(true, {0, 0, 0, 0});
+        if (changed_main && !changed_ui) {
+            UI_RENDER_AGENT->render_target();
+        } else if (!changed_main && changed_ui) {
+            MAIN_RENDER_AGENT->render_target();
+            UI_RENDER_AGENT->render_target();
         }
+        SDL_RenderPresent(RENDERER);
     }
     frame_count++;
 
@@ -120,7 +140,7 @@ SDL_AppResult SDL_AppEvent(void* appState, SDL_Event* event) {
         if (CURRENT_RENDER_STATE == 1) {
             CRTEffectUniforms uniforms;
             SDL_zero(uniforms);
-            LOG(LogLevel::DEBUG, "Width: %d, Height: %d", SCREEN_WIDTH, SCREEN_HEIGHT);
+            LOG(LogLevel::DEBUG, "Window Width: %d, Height: %d", SCREEN_WIDTH, SCREEN_HEIGHT);
             uniforms.texture_width = SCREEN_WIDTH;
             uniforms.texture_height = SCREEN_HEIGHT;
             if (!SDL_SetGPURenderStateFragmentUniforms(RENDER_STATES[CURRENT_RENDER_STATE].state, 0, &uniforms, sizeof(uniforms))) {
@@ -128,7 +148,8 @@ SDL_AppResult SDL_AppEvent(void* appState, SDL_Event* event) {
                 CURRENT_RENDER_STATE = 0;
             }
         }
-        DIRTY_SCREEN = true;
+        MAIN_RENDER_AGENT->dirty = true;
+        UI_RENDER_AGENT->dirty = true;
     }
     INPUTS->update(event);
 

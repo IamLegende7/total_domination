@@ -1,8 +1,28 @@
+#include <SDL3_ttf/SDL_ttf.h>
+
 #include "renderring/render_agent.hpp"
 #include "renderring/shaders.hpp"
+#include "ui.hpp"
 
-RenderAgent::RenderAgent() {
-    target = SDL_CreateTexture(RENDERER, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, SCREEN_WIDTH, SCREEN_HEIGHT);
+RenderAgent::RenderAgent(SDL_Renderer* renderer, bool allow_text) {
+    this->renderer = renderer;
+    target = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, SCREEN_WIDTH, SCREEN_HEIGHT);
+    if (allow_text) {
+        if (RENDER_SETTINGS["render_mode"] == 1) {
+            text_engine = TTF_CreateRendererTextEngine(renderer);
+        }
+    }
+}
+
+RenderAgent::~RenderAgent() {
+    if (text_engine != nullptr) {
+        TTF_DestroyRendererTextEngine(text_engine);
+    }
+    for (auto pair : fonts) {
+        if (TTF_WasInit()) {
+            TTF_CloseFont(pair.second);
+        }
+    }
 }
 
 RenderAgentTexture RenderAgent::load_texture(const std::string& texture_path) {
@@ -14,7 +34,7 @@ RenderAgentTexture RenderAgent::load_texture(const std::string& texture_path) {
     }
 
     if (int(RENDER_SETTINGS["render_mode"]) == 1) {
-        SDL_Texture* texture = SDL_CreateTextureFromSurface(RENDERER, image_surface);
+        SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, image_surface);
         if (texture == NULL) {
             LOG(LogLevel::WARNING, "Could not create Texture from Surface: %s", SDL_GetError());
         }
@@ -40,14 +60,15 @@ bool RenderAgent::texture_exists(const std::string& id) {
     return agent_textures.find(id) != agent_textures.end();
 }
 
-RenderAgentTexture* RenderAgent::get_texture(const std::string& id) {
+RenderAgentTexture* RenderAgent::get_texture(const std::string& id, bool suppress_logs) {
     auto it = agent_textures.find(id);
     if (it != agent_textures.end()) {
         return &it->second;
     }
 
     static RenderAgentTexture fallback{};
-    LOG(LogLevel::WARNING, "Requested non-existent texture \"%s\"", id.c_str());
+    if (!suppress_logs)
+        LOG(LogLevel::WARNING, "Requested non-existent texture \"%s\"", id.c_str());
     return &fallback;
 }
 
@@ -73,36 +94,64 @@ bool RenderAgent::add_entity(const std::string& id, const std::string& sprite_id
     return true;
 };
 
-void RenderAgent::render(bool clear_renderer) {
+void RenderAgent::render_target() {
+    SDL_SetRenderTarget(renderer, NULL);
+    RenderState* current_state = &RENDER_STATES[CURRENT_RENDER_STATE];
+    SDL_SetGPURenderState(renderer, current_state->state);
+    SDL_RenderTexture(renderer, target, NULL, NULL);
+    SDL_SetGPURenderState(renderer, NULL);
+}
+
+bool RenderAgent::render(bool clear_renderer, SDL_Color clear_colour) {
+    if (!dirty)
+        return false;
+
     //LOG(LogLevel::DEBUG, "Starting Renderpass");
     if (int(RENDER_SETTINGS["render_mode"]) == 1) {
-        // Set target
+        // Set target //
         if ((target->w != SCREEN_WIDTH) || (target->h != SCREEN_HEIGHT)) {
-            target = SDL_CreateTexture(RENDERER, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, SCREEN_WIDTH, SCREEN_HEIGHT);
+            target = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, SCREEN_WIDTH, SCREEN_HEIGHT);
         }
-        SDL_SetRenderTarget(RENDERER, target);
+        SDL_SetRenderTarget(renderer, target);
 
+        // Clear //
         if (clear_renderer) {
-            SDL_SetRenderDrawColor(RENDERER, 26, 26, 26, 255);
-            SDL_RenderClear(RENDERER);
+            SDL_SetRenderDrawColor(renderer, clear_colour.r, clear_colour.g, clear_colour.b, clear_colour.a);
+            SDL_RenderClear(renderer);
         }
 
+        // Render entitys //
         for (const RenderAgentEntity& entity : agent_entitys) {
+            int zoom;
+            if (!entity.use_ui_zoom) {
+                zoom = CAMERA.zoom;
+            } else {
+                zoom = UI_ZOOM;
+            }
+            int real_x;
+            int real_y;
+            if (entity.follow_map) {
+                real_x = (entity.x-CAMERA.x)*zoom;
+                real_y = (entity.y-CAMERA.y)*zoom;
+            } else {
+                real_x = entity.x*zoom;
+                real_y = entity.y*zoom;
+            }
             if (
-                ((entity.x-CAMERA.x)*CAMERA.zoom > SCREEN_WIDTH*-0.5) &&
-                ((entity.x-CAMERA.x)*CAMERA.zoom < SCREEN_WIDTH*1.5) &&
-                ((entity.y-CAMERA.y)*CAMERA.zoom > SCREEN_HEIGHT*-0.5) &&
-                ((entity.y-CAMERA.y)*CAMERA.zoom < SCREEN_HEIGHT*1.5)
+                (real_x > SCREEN_WIDTH*-0.5) &&
+                (real_x < SCREEN_WIDTH*1.5) &&
+                (real_y > SCREEN_HEIGHT*-0.5) &&
+                (real_y < SCREEN_HEIGHT*1.5)
             ) {
-                if (DEBUG["all_debug_logs"]) LOG(LogLevel::DEBUG, "Renderring Entity %s at %d;%d", entity.name.c_str(), (entity.x-CAMERA.x)*CAMERA.zoom, (entity.y-CAMERA.y)*CAMERA.zoom);
-                // Sprite
+                if (DEBUG["all_debug_logs"])
+                    LOG(LogLevel::DEBUG, "Renderring Entity %s at %d;%d", entity.name.c_str(), real_x, real_y);
                 if (!(agent_sprites.find(entity.sprite) != agent_sprites.end())) {
                     LOG(LogLevel::WARNING, "Sprite '%s' not found", entity.sprite.c_str());
                 }
                 const RenderAgentSprite* sprite = &agent_sprites[entity.sprite];
                 SDL_FRect dstrect = {
-                    (float)((entity.x-CAMERA.x)*CAMERA.zoom),
-                    (float)((entity.y-CAMERA.y)*CAMERA.zoom),
+                    (float)real_x,
+                    (float)real_y,
                     (sprite->texture_rect.w*CAMERA.zoom),
                     (sprite->texture_rect.h*CAMERA.zoom)
                 };
@@ -122,24 +171,21 @@ void RenderAgent::render(bool clear_renderer) {
                         LOG(LogLevel::WARNING, "Texture '%s' not found", sprite->texture.c_str());
                     }
                     SDL_Texture* texture = agent_textures[sprite->texture].get_texture();
-                    SDL_RenderTexture(RENDERER, texture, &sprite->texture_rect, &dstrect);
+                    SDL_RenderTexture(renderer, texture, &sprite->texture_rect, &dstrect);
                 }
             }
         }
-        SDL_SetRenderTarget(RENDERER, NULL);
 
-        RenderState* current_state = &RENDER_STATES[CURRENT_RENDER_STATE];
-        SDL_SetGPURenderState(RENDERER, current_state->state);
-        SDL_RenderTexture(RENDERER, target, NULL, NULL);
-        SDL_SetGPURenderState(RENDERER, NULL);
-
-        SDL_RenderPresent(RENDERER);
-
-        if (int(RENDER_SETTINGS["render_mode"]) == 2) {
-            SDL_UpdateWindowSurface(WINDOW);
+        // Render text //
+        for (const Text& text : texts) {
+            TTF_DrawRendererText(text.text, text.x, text.y);
         }
 
+        // Render "target" to Window //
+        render_target();
     }
+    dirty = false;
+    return true;
 }
 
 RenderAgentTexture RenderAgent::bake_texture(TextureConstructor* texture_constructors[], const int array_size, const bool force_file_loading) {
@@ -152,17 +198,18 @@ RenderAgentTexture RenderAgent::bake_texture(TextureConstructor* texture_constru
         surface_width = std::max(surface_width, (constructor->texture->width+constructor->x)*constructor->size);
         surface_height = std::max(surface_height, (constructor->texture->height+constructor->y)*constructor->size);
     }
-    if (DEBUG["all_debug_logs"]) LOG(LogLevel::DEBUG, "Bake Surface is %dx%d", surface_width, surface_height);
+    if (DEBUG["all_debug_logs"])
+        LOG(LogLevel::DEBUG, "Bake Surface is %dx%d", surface_width, surface_height);
     if (RENDER_SETTINGS["render_mode"] == 1) {
-        SDL_Texture* bake_texture = SDL_CreateTexture(RENDERER, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, surface_width, surface_height);
+        SDL_Texture* bake_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, surface_width, surface_height);
         SDL_SetTextureScaleMode(bake_texture, SDL_SCALEMODE_NEAREST);
-        SDL_SetRenderTarget(RENDERER, bake_texture);
+        SDL_SetRenderTarget(renderer, bake_texture);
         for (int i = 0; i < array_size; ++i) {
             TextureConstructor* constructor = texture_constructors[i];
             SDL_FRect dstrect = {(float)(constructor->x*constructor->size), (float)(constructor->y*constructor->size), (float)(constructor->texture->width*constructor->size), (float)(constructor->texture->height*constructor->size)};
-            SDL_RenderTexture(RENDERER, constructor->texture->get_texture(), NULL, &dstrect);
+            SDL_RenderTexture(renderer, constructor->texture->get_texture(), NULL, &dstrect);
         }
-        SDL_SetRenderTarget(RENDERER, nullptr);
+        SDL_SetRenderTarget(renderer, nullptr);
         return RenderAgentTexture(bake_texture, surface_width, surface_height);
     }
     return RenderAgentTexture();
@@ -172,7 +219,7 @@ void RenderAgent::drop_texture(const std::string& id) {
     agent_textures.erase(id.c_str());
 }
 
-RenderAgentEntity* RenderAgent::get_entity(const std::string& id) {
+RenderAgentEntity* RenderAgent::get_entity(const std::string& id, bool suppress_logs) {
     for (auto& entity : agent_entitys) {
         if (entity.name == id) {
             //LOG(LogLevel::DEBUG, "Found entity %s!", id.c_str());
@@ -180,7 +227,7 @@ RenderAgentEntity* RenderAgent::get_entity(const std::string& id) {
         }
     }
 
-    static RenderAgentEntity fallback{};
-    LOG(LogLevel::WARNING, "Requested non-existent entity \"%s\"", id.c_str());
-    return &fallback;
+    if (!suppress_logs)
+        LOG(LogLevel::WARNING, "Requested non-existent entity \"%s\"", id.c_str());
+    return nullptr;
 }

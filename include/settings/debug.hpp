@@ -15,6 +15,9 @@ inline void init_debug_settings(std::string config_file) {
     DEBUG["save_texture_atlases"] =     Setting(load_setting<bool>(config_file, "Renderring", "save_texture_atlases", false));
     // Movement //
     DEBUG["show_coords"] =              Setting(load_setting<bool>(config_file, "Movement", "show_coords", false));
+    // HUD //
+    DEBUG["show_fps"] =                 Setting(load_setting<bool>(config_file, "HUD", "show_fps", false));
+    DEBUG["show_tps"] =                 Setting(load_setting<bool>(config_file, "HUD", "show_tps", false));
     // Logging // 
     DEBUG["test_logger"] =              Setting(load_setting<bool>(config_file, "Logging", "test_logger", false));
     DEBUG["all_debug_logs"] =           Setting(load_setting<bool>(config_file, "Logging", "all_debug_logs", false));

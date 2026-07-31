@@ -1,6 +1,5 @@
-TODO: Camera movement
-
-TODO: Add SDL_GPU renderring
 TODO: Add software renderring
-
-FIXME: sometimes super long loading times when using SDL_GPU
+TODO: Main menu
+TODO: Settings menu
+TODO: Map selection/matchmaking menu
+TODO: actors

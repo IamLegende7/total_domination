@@ -11,6 +11,7 @@
 #include "status.hpp"
 #include "main.hpp"
 #include "utils/json.hpp"
+#include "utils/logger.hpp"
 
 // Local
 std::tuple<std::string, std::string> get_compiled_path(const std::string& hlsl_path, const SDL_GPUShaderFormat format) {

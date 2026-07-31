@@ -114,7 +114,8 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
     }
 
     // Render Agents //
-    MAIN_RENDER_AGENT = new RenderAgent();
+    MAIN_RENDER_AGENT = new RenderAgent(RENDERER);
+    UI_RENDER_AGENT = new RenderAgent(RENDERER, true);
 
     // Window icon //
     std::string icon_path = std::string(LOCATIONS["resource_dir"]) + "/icons/icon.png";
@@ -146,6 +147,18 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
     //MAIN_RENDER_AGENT->add_texture("test_texture", LOCATIONS["texture_dir"].get_str()+"/test.png");
     //MAIN_RENDER_AGENT->add_sprite("test_sprite", "test_texture", 0, 0, 32, 32);
     //MAIN_RENDER_AGENT->add_entity("test_entity", "test_sprite", 0, 0, 4);
+
+    // TMP:
+    UI_RENDER_AGENT->add_font("def_font", SETTINGS["font"].get_str(), (float)(SETTINGS["font_size"]/10));
+    int y = 20;
+    if (DEBUG["show_fps"]) {
+        UI_RENDER_AGENT->add_text("FPS", "FPS: --", "def_font", 20, y);
+        y += 60;
+    }
+    if (DEBUG["show_tps"]) {
+        UI_RENDER_AGENT->add_text("TPS", "TPS: --", "def_font", 20, y);
+        y += 60;
+    }
 
     LOG(LogLevel::INFO, "All good; have fun!");
     return SDL_APP_CONTINUE;
