@@ -8,7 +8,7 @@
 
 std::string get_texture_path(const std::string& name) {
     rapidjson::Document textures_json = open_json(LOCATIONS["textures_json"]);
-    if (!textures_json.IsObject()) { // <-- Seg fault here
+    if (!textures_json.IsObject()) {
         LOG(LogLevel::WARNING, "%s is not a valid textures.json file: root is not an object!", LOCATIONS["textures_json"].get_c_str());
         return LOCATIONS["missing_texture"];
     }

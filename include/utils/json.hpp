@@ -30,7 +30,7 @@ inline std::string open_file(const std::string& filename) {
     return buffer.str();
 }
 
-inline rapidjson::Document open_json(const std::string& filename) { // TODO: Add more debug!
+inline rapidjson::Document open_json(const std::string& filename) {
     rapidjson::Document document;
     try {
         std::string json_contents = open_file(filename);

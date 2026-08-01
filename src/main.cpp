@@ -12,7 +12,7 @@
 
 #include "main.hpp"
 #include "map.hpp"
-#include "inputs.hpp"
+#include "inputs/inputs.hpp"
 #include "renderring/render_agents.hpp"
 #include "renderring/textures.hpp"
 #include "renderring/shaders.hpp"
@@ -82,13 +82,49 @@ SDL_AppResult SDL_AppIterate(void* appState) {
     while (accumulator_tick >= ms_per_tick) {
         if (DEBUG["all_debug_logs"]) LOG(LogLevel::DEBUG, "Current tick = %d", TICKS);
 
-
         if (MODE == 0) {
             if (DEBUG["force_load_map"].get_str() == "none") {
                 // Main Menu UI logic
             } else {
+                // map loading:
+                // TODO: move to dedecated function
                 MAIN_MAP = new Map(MAIN_RENDER_AGENT, DEBUG["force_load_map"]);
                 CAMERA.zoom = SETTINGS["initial_camera_zoom"];
+                int y = 20;
+                if (DEBUG["show_fps"]) {
+                    UI_RENDER_AGENT->add_text("FPS", "FPS: --", "def_font", 20, y);
+                    y += 60;
+                }
+                if (DEBUG["show_tps"]) {
+                    UI_RENDER_AGENT->add_text("TPS", "TPS: --", "def_font", 20, y);
+                    y += 60;
+                }
+                if ((SETTINGS["input_mode"] == 0) || (SETTINGS["input_mode"] == 4)) {
+                    // Change to palace actor pos
+                    TILE_SELECTION_X = 0;
+                    TILE_SELECTION_Y = 0;
+                    std::string atlas_ui_textures[] = {
+                        "td:selected_tile_top",
+                        "td:selected_tile_left",
+                        "td:selected_tile_right"
+                    };
+                    bake_atlas(MAIN_RENDER_AGENT, "atlas:ui", atlas_ui_textures, sizeof(atlas_ui_textures)/sizeof(atlas_ui_textures[0]));
+                    MapTile* selected_tile = MAIN_MAP->get_tile(TILE_SELECTION_Y, TILE_SELECTION_X);
+                    const int selected_tile_x = 16*(selected_tile->x-selected_tile->y);
+                    const int selected_tile_y = 11*(selected_tile->x+selected_tile->y)-(16*(selected_tile->height-1));
+                    const auto [surrounding_height_top, surrounding_height_bottom, surrounding_height_left, surrounding_height_right] = MAIN_MAP->get_surrounding(TILE_SELECTION_Y, TILE_SELECTION_X);
+                    const bool hide_left = (selected_tile->height <= surrounding_height_bottom);
+                    const bool hide_right = (selected_tile->height <= surrounding_height_right);
+                    MAIN_RENDER_AGENT->add_entity("selected_tile_top", "td:selected_tile_top", selected_tile_x, selected_tile_y, selected_tile->size*4, 0, true, false, false);
+                    MAIN_RENDER_AGENT->add_entity("selected_tile_left", "td:selected_tile_left", selected_tile_x, selected_tile_y, selected_tile->size*4, 0, true, false, hide_left);
+                    MAIN_RENDER_AGENT->add_entity("selected_tile_right", "td:selected_tile_right", selected_tile_x, selected_tile_y, selected_tile->size*4, 0, true, false, hide_right);
+                    RenderAgentEntity* selected_tile_top = MAIN_RENDER_AGENT->get_entity("selected_tile_top");
+                    SDL_FRect& selected_tile_top_rect = MAIN_RENDER_AGENT->get_sprite(selected_tile_top->sprite)->texture_rect;
+                    CAMERA.x = (selected_tile_top->x+(int)(selected_tile_top_rect.w/2))-(int)((SCREEN_WIDTH/2)/CAMERA.zoom);
+                    CAMERA.y = (selected_tile_top->y+(int)(selected_tile_top_rect.h/2))-(int)((SCREEN_HEIGHT/2)/CAMERA.zoom);
+                    MAIN_RENDER_AGENT->dirty = true;
+                    UI_RENDER_AGENT->dirty = true;
+                }
                 MODE = 1;
             }
         }

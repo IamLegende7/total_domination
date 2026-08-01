@@ -30,9 +30,11 @@ struct Camera {
     Camera(int x, int y, int zoom): x(x), y(y), zoom(zoom) {};
 };
 
-inline Camera CAMERA = Camera(-100, -100, 1);
+inline Camera CAMERA = Camera(-100, -100, 1); // TODO: gentle camera movement // make pos independent of window size
 
 // UI //
 inline int UI_ZOOM = 4;
+inline int TILE_SELECTION_X = -1;
+inline int TILE_SELECTION_Y = -1;
 
 #endif

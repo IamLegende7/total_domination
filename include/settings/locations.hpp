@@ -36,6 +36,7 @@ inline void init_locations_settings(std::string config_file) {
     // Textures //
     LOCATIONS["texture_dir"] =          Setting(replace_locations(load_setting<std::string>(config_file, "Textures", "texture_dir")));
     LOCATIONS["texturepack_dir"] =      Setting(replace_locations(load_setting<std::string>(config_file, "Textures", "texturepack_dir")));
+    LOCATIONS["missing_texture"] =      Setting(replace_locations(load_setting<std::string>(config_file, "Textures", "missing_texture")));
     LOCATIONS["missing_texture"] =      Setting(replace_locations(load_setting<std::string>(config_file, "Textures", "missing_texture_tile")));
     LOCATIONS["textures_json"] =        Setting(replace_locations(load_setting<std::string>(config_file, "Textures", "textures_json")));
     // Logging //

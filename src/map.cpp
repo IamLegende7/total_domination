@@ -2,6 +2,7 @@
 
 #include <SDL3/SDL.h>
 #include <set>
+#include <tuple>
 #include <SDL3/SDL_timer.h>
 #include "BS_thread_pool.hpp"
 #include <atomic>
@@ -13,6 +14,33 @@
 #include "settings/main.hpp"
 #include "settings/debug.hpp"
 #include "utils/logger.hpp"
+
+
+std::tuple<int, int, int, int> Map::get_surrounding(const int row, const int col) {
+    return std::tuple<int, int, int, int> {
+        (row > 0)
+            ? map_data[row-1][col].height
+            : -1,
+        (row < (int)rows-1)
+            ? map_data[row+1][col].height
+            : -1,
+        (col > 0)
+            ? map_data[row][col-1].height
+            : -1,
+        (col < (int)cols-1)
+            ? map_data[row][col+1].height
+            : -1
+    };
+}
+
+MapTile* Map::get_tile(const int row, const int col, const bool suppress_logs) {
+    if (!(row < (int)rows) || !(col < (int)cols)) {
+        if (!suppress_logs)
+            LOG(LogLevel::WARNING, "Requested non-existent tile at %dx%d", col, row);
+        return nullptr;
+    }   
+    return &map_data[row][col];
+}
 
 Map::Map(RenderAgent* agent, const std::string& map_path) {
     LOG(LogLevel::INFO, "Loading map \"%s\"", replace_locations(map_path).c_str());
@@ -46,6 +74,9 @@ Map::Map(RenderAgent* agent, const std::string& map_path) {
         return;
     }
 
+    add_texture(agent, "td:tile_missing");
+    add_texture(agent, "td:top_missing");
+
     // DECLARATIONS //
     if (map_json.HasMember("declarations")) {
         if (map_json["declarations"].HasMember("textures")) {
@@ -55,12 +86,12 @@ Map::Map(RenderAgent* agent, const std::string& map_path) {
                     texture_constructors[constructor_index] = new TextureConstructor(
                         declaration.value[constructor_index].HasMember("texture") ?
                             declaration.value[constructor_index]["texture"].GetString() :
-                            "td:missing",
+                            "td:tile_missing",
                         agent->texture_exists(declaration.value[constructor_index]["texture"].GetString()) ?
                             "td:none" :
                             (declaration.value[constructor_index].HasMember("texture") ?
                                 get_texture_path(declaration.value[constructor_index]["texture"].GetString()) :
-                                get_texture_path("td:missing")),
+                                get_texture_path("td:tile_missing")),
                         declaration.value[constructor_index].HasMember("x") ?
                             declaration.value[constructor_index]["x"].GetInt() :
                             0,
@@ -161,22 +192,15 @@ Map::Map(RenderAgent* agent, const std::string& map_path) {
         const auto row_size = map_json["data"][r].Size();
         for (size_t c = 0; c < row_size; ++c) {
             MapTile& current_tile = map_data[r][c];
+            const auto [surrounding_height_top, surrounding_height_bottom, surrounding_height_left, surrounding_height_right] = get_surrounding(r, c);
             int surrounding_height = std::min(
                 std::min(
-                    (r > 0)
-                        ? map_data[r-1][c].height
-                        : -1,
-                    (r < rows-1)
-                        ? map_data[r+1][c].height
-                        : -1
+                    surrounding_height_top,
+                    surrounding_height_bottom
                 ),
                 std::min(
-                    (c > 0)
-                        ? map_data[r][c-1].height
-                        : -1,
-                    (c < cols-1)
-                        ? map_data[r][c+1].height
-                        : -1
+                    surrounding_height_left,
+                    surrounding_height_right
                 )
             );
 
@@ -220,6 +244,8 @@ Map::Map(RenderAgent* agent, const std::string& map_path) {
     Uint64 elapsed_ticks = SDL_GetPerformanceCounter() - load_start_time;
     double elapsed_ms = (elapsed_ticks / (double)preformance_frequency) * 1000.0;
     LOG(LogLevel::INFO, "Loaded Map \"%s\" in %f ms", map_name.c_str(), elapsed_ms);
+
+    //for (size_t col_index = 0; col_index < cols; ++col_index) {LOG(LogLevel::DEBUG, "Tile %s at %dx%d", map_data[0][col_index].top_tile.c_str(), map_data[0][col_index].x, map_data[0][col_index].y);}
 }
 
 Map::~Map() {

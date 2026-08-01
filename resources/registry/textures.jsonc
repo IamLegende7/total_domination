@@ -3,13 +3,17 @@
     "description":  "The default TD textures",
     "data": {
         // INTERNAL //
-        "td:missing": "$texture_dir$/missing.png",
+        "td:selected_tile_top": "$texture_dir$/ui/selected_tile/top.png",
+        "td:selected_tile_left": "$texture_dir$/ui/selected_tile/left.png",
+        "td:selected_tile_right": "$texture_dir$/ui/selected_tile/right.png",
         "td:test": "$texture_dir$/test.png",
         // Tiles //
+        "td:tile_missing": "$texture_dir$/tiles/missing.png",
         "td:dirt": "$texture_dir$/tiles/dirt.png",
         "td:dry_dirt": "$texture_dir$/tiles/dry_dirt.png",
         "td:stone": "$texture_dir$/tiles/stone.png",
         // Tops //
+        "td:top_missing": "$texture_dir$/tiles/tops/missing.png",
         "td:top_grass": "$texture_dir$/tiles/tops/grass.png",
         "td:top_grass_plane": "$texture_dir$/tiles/tops/grass_plane.png",
         "td:top_forest": "$texture_dir$/tiles/tops/forest.png",

@@ -6,6 +6,7 @@
 #include <variant>
 #include <unordered_map>
 #include <string>
+#include <tuple>
 #include <memory>
 
 #include "main.hpp"
@@ -59,11 +60,12 @@ struct RenderAgentEntity {
     int rotation;
     bool follow_map;
     bool use_ui_zoom;
+    bool hidden;
 
     RenderAgentEntity()
-        : name("missing"), sprite("td:missing"), x(-100), y(-100), size(10), rotation(0), follow_map(true), use_ui_zoom(false) {};
-    RenderAgentEntity(std::string name, std::string sprite, int x, int y, int size, int rotation=0, bool follow_map=true, bool use_ui_zoom=false)
-        : name(name), sprite(sprite), x(x), y(y), size(size), rotation(rotation), follow_map(follow_map), use_ui_zoom(use_ui_zoom) {};
+        : name("missing"), sprite("td:missing"), x(-100), y(-100), size(10), rotation(0), follow_map(true), use_ui_zoom(false), hidden(false) {};
+    RenderAgentEntity(std::string name, std::string sprite, int x, int y, int size, int rotation=0, bool follow_map=true, bool use_ui_zoom=false, bool hidden=false)
+        : name(name), sprite(sprite), x(x), y(y), size(size), rotation(rotation), follow_map(follow_map), use_ui_zoom(use_ui_zoom), hidden(hidden) {};
 };
 
 struct TextureConstructor {
@@ -94,6 +96,8 @@ class RenderAgent {
         bool dirty = true;
         RenderAgent(SDL_Renderer* renderer, bool allow_text=false);
         ~RenderAgent();
+        bool render(bool clear_renderer=true, SDL_Color clear_colour={26, 26, 26, 255});
+        void render_target();
 
         // Textures
         bool add_texture(const std::string& id, const std::string& texture_path);
@@ -106,11 +110,10 @@ class RenderAgent {
 
         // Sprites
         bool add_sprite(const std::string& id, const std::string& texture_id, const int& x, const int& y, const int& width=-1, const int& height=-1);
-        bool render(bool clear_renderer=true, SDL_Color clear_colour={26, 26, 26, 255});
-        void render_target();
+        RenderAgentSprite* get_sprite(const std::string& id, bool suppress_logs=false);
 
         // Entitys
-        bool add_entity(const std::string& id, const std::string& sprite_id, const int& x, const int& y, const int& size, const int& rotation=0);
+        bool add_entity(const std::string& id, const std::string& sprite_id, const int& x, const int& y, const int& size, const int& rotation=0, bool follow_map=true, bool use_ui_zoom=false, bool hidden=false);
         RenderAgentEntity* get_entity(const std::string& id, bool suppress_logs=false);
 
         // Text

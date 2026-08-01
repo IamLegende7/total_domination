@@ -1,5 +1,12 @@
+FIXME: low framerate after this commit ()
 TODO: Add software renderring
+TODO: mouse inputs
+TODO: gamepad inputs
+TODO: touch inputs
+TODO: quick switching between input modes
 TODO: Main menu
 TODO: Settings menu
 TODO: Map selection/matchmaking menu
 TODO: actors
+TODO: .lang files for translation
+TODO: own SDL_Scancode <-> string mapping (SDL3s is inconsistand across platforms)

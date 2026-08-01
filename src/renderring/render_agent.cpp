@@ -74,7 +74,7 @@ RenderAgentTexture* RenderAgent::get_texture(const std::string& id, bool suppres
 
 bool RenderAgent::add_texture(const std::string& id, const std::string& texture_path) {
     return insert_texture(id, load_texture(texture_path));
-};
+}
 
 bool RenderAgent::add_sprite(const std::string& id, const std::string& texture_id, const int& x, const int& y, const int& width, const int& height) {
     int sprite_x = x;
@@ -86,10 +86,22 @@ bool RenderAgent::add_sprite(const std::string& id, const std::string& texture_i
     agent_sprites[id] = RenderAgentSprite(texture_id, srcrect);
     LOG(LogLevel::DEBUG, "Added new Sprite %s: srcrect: %f, %f, %f, %f", id.c_str(), agent_sprites[id].texture_rect.x, agent_sprites[id].texture_rect.y, agent_sprites[id].texture_rect.w, agent_sprites[id].texture_rect.h);
     return true;
-};
+}
 
-bool RenderAgent::add_entity(const std::string& id, const std::string& sprite_id, const int& x, const int& y, const int& size, const int& rotation) {
-    agent_entitys.push_back(RenderAgentEntity(id, sprite_id, x, y, size, rotation));
+RenderAgentSprite* RenderAgent::get_sprite(const std::string& id, bool suppress_logs) {
+    auto it = agent_sprites.find(id);
+    if (it != agent_sprites.end()) {
+        return &it->second;
+    }
+
+    static RenderAgentSprite fallback{};
+    if (!suppress_logs)
+        LOG(LogLevel::WARNING, "Requested non-existent sprite \"%s\"", id.c_str());
+    return &fallback;
+}
+
+bool RenderAgent::add_entity(const std::string& id, const std::string& sprite_id, const int& x, const int& y, const int& size, const int& rotation, bool follow_map, bool use_ui_zoom, bool hidden) {
+    agent_entitys.push_back(RenderAgentEntity(id, sprite_id, x, y, size, rotation, follow_map, use_ui_zoom, hidden));
     if (DEBUG["all_debug_logs"]) LOG(LogLevel::DEBUG, "Added new Entity %s: X: %d, Y: %d, Size: %d, Rotation: %d", id.c_str(), x, y, size, rotation);
     return true;
 };
@@ -122,6 +134,9 @@ bool RenderAgent::render(bool clear_renderer, SDL_Color clear_colour) {
 
         // Render entitys //
         for (const RenderAgentEntity& entity : agent_entitys) {
+            if (entity.hidden)
+                continue;
+
             int zoom;
             if (!entity.use_ui_zoom) {
                 zoom = CAMERA.zoom;
@@ -148,7 +163,7 @@ bool RenderAgent::render(bool clear_renderer, SDL_Color clear_colour) {
                 if (!(agent_sprites.find(entity.sprite) != agent_sprites.end())) {
                     LOG(LogLevel::WARNING, "Sprite '%s' not found", entity.sprite.c_str());
                 }
-                const RenderAgentSprite* sprite = &agent_sprites[entity.sprite];
+                const RenderAgentSprite* sprite = get_sprite(entity.sprite);
                 SDL_FRect dstrect = {
                     (float)real_x,
                     (float)real_y,

@@ -18,6 +18,8 @@
 // for storing settings
 #include <unordered_map>
 
+// TODO: rewrite
+
 // Setting class //
 class Setting {
     public:

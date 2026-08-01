@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <set>
+#include <tuple>
 #include "rapidjson/document.h"
 #include "rapidjson/rapidjson.h"
 
@@ -39,6 +40,9 @@ class Map {
         std::string map_description;
         size_t rows;
         size_t cols;
+
+        std::tuple<int, int, int, int> get_surrounding(const int row, const int col);
+        MapTile* get_tile(const int row, const int col, const bool suppress_logs=false);
 
         // INIT & CLEANUP //
         Map(RenderAgent* agent, const std::string& map_path);
