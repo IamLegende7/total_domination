@@ -14,6 +14,7 @@
 #include "renderring/shaders.hpp"
 
 #include "utils/logger.hpp"
+#include "utils/quadtree.hpp"
 
 #include "settings/render.hpp"
 #include "settings/locations.hpp"
@@ -40,12 +41,12 @@ struct RenderAgentTexture {
 
 struct RenderAgentSprite {
     std::string texture;
-    SDL_FRect texture_rect = {0, 0, 32, 32};
+    SDL_Rect texture_rect = {0, 0, 32, 32};
 
     RenderAgentSprite()
         : texture("atlas_interface"), texture_rect({0, 0, 16, 16}) {}
 
-    RenderAgentSprite(std::string texture, SDL_FRect texture_rect)
+    RenderAgentSprite(std::string texture, SDL_Rect texture_rect)
         : texture(std::move(texture)), texture_rect(texture_rect) {}
 
     RenderAgentSprite(const RenderAgentSprite& other) = default;
@@ -56,16 +57,15 @@ struct RenderAgentEntity {
     std::string name;
     std::string sprite;
     int x, y;
-    int size;
+    int width, height;
+    int layer;
     int rotation;
-    bool follow_map;
-    bool use_ui_zoom;
     bool hidden;
 
     RenderAgentEntity()
-        : name("missing"), sprite("td:missing"), x(-100), y(-100), size(10), rotation(0), follow_map(true), use_ui_zoom(false), hidden(false) {};
-    RenderAgentEntity(std::string name, std::string sprite, int x, int y, int size, int rotation=0, bool follow_map=true, bool use_ui_zoom=false, bool hidden=false)
-        : name(name), sprite(sprite), x(x), y(y), size(size), rotation(rotation), follow_map(follow_map), use_ui_zoom(use_ui_zoom), hidden(hidden) {};
+        : name("missing"), sprite("td:missing"), x(-100), y(-100), width(0), height(0), layer(-1), rotation(0), hidden(false) {};
+    RenderAgentEntity(std::string name, std::string sprite, int x, int y, int width, int height, int layer, int rotation=0, bool hidden=false)
+        : name(name), sprite(sprite), x(x), y(y), width(width), height(height), layer(layer), rotation(rotation), hidden(hidden) {};
 };
 
 struct TextureConstructor {
@@ -85,18 +85,25 @@ class RenderAgent {
     private:
         std::unordered_map<std::string, RenderAgentTexture> agent_textures;
         std::unordered_map<std::string, RenderAgentSprite> agent_sprites;
-        std::vector<RenderAgentEntity> agent_entitys;
+        QuadtreeNode<RenderAgentEntity> agent_entitys;
+        int heighest_layer = -1;
+        //std::vector<RenderAgentEntity> agent_entitys;
         SDL_Renderer* renderer;
         SDL_Texture* target; // Render to this texture first before writing that to the screen
+        std::string* tex_cache_name;
+        SDL_Texture* tex_cache;
         TTF_TextEngine* text_engine = nullptr;
         std::unordered_map<std::string, TTF_Font*> fonts;
         std::vector<Text> texts;
         
     public:
         bool dirty = true;
+        int map_width;
+        int map_height;
         RenderAgent(SDL_Renderer* renderer, bool allow_text=false);
         ~RenderAgent();
-        bool render(bool clear_renderer=true, SDL_Color clear_colour={26, 26, 26, 255});
+        std::tuple<int, int> set_dimensions(const int cols, const int rows, const int x=0, const int y=0);
+        bool render(const int zoom=0, const int x_offset=0, const int y_offset=0, const bool clear_renderer=true, const int resolution=1, SDL_Color clear_colour={26, 26, 26, 255});
         void render_target();
 
         // Textures
@@ -113,7 +120,7 @@ class RenderAgent {
         RenderAgentSprite* get_sprite(const std::string& id, bool suppress_logs=false);
 
         // Entitys
-        bool add_entity(const std::string& id, const std::string& sprite_id, const int& x, const int& y, const int& size, const int& rotation=0, bool follow_map=true, bool use_ui_zoom=false, bool hidden=false);
+        bool add_entity(const std::string& id, const std::string& sprite_id, const int& x, const int& y, const int& layer=-1, const int& rotation=0, bool hidden=false);
         RenderAgentEntity* get_entity(const std::string& id, bool suppress_logs=false);
 
         // Text

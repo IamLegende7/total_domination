@@ -1,17 +1,22 @@
 #include <SDL3_ttf/SDL_ttf.h>
+#include <cmath>
+#include <algorithm>
+#include <tuple>
 
 #include "renderring/render_agent.hpp"
 #include "renderring/shaders.hpp"
 #include "ui.hpp"
+#include "utils/quadtree.hpp"
 
 RenderAgent::RenderAgent(SDL_Renderer* renderer, bool allow_text) {
     this->renderer = renderer;
-    target = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, SCREEN_WIDTH, SCREEN_HEIGHT);
+    target = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, std::ceil(SCREEN_WIDTH/RENDER_SETTINGS["resolution"]), std::ceil(SCREEN_HEIGHT/RENDER_SETTINGS["resolution"]));
     if (allow_text) {
         if (RENDER_SETTINGS["render_mode"] == 1) {
             text_engine = TTF_CreateRendererTextEngine(renderer);
         }
     }
+    agent_entitys.set_capacity(16);
 }
 
 RenderAgent::~RenderAgent() {
@@ -24,6 +29,20 @@ RenderAgent::~RenderAgent() {
         }
     }
 }
+
+std::tuple<int, int> RenderAgent::set_dimensions(const int cols, const int rows, const int x, const int y) {
+    int max_width = 0;
+    int max_height = 0;
+    for (const auto& pair : agent_sprites) {
+        max_width = std::max(max_width, pair.second.texture_rect.w);
+        max_height = std::max(max_height, pair.second.texture_rect.h);
+    }
+    map_width = (max_width+(16*(rows-1)))*2;
+    map_height = (max_height+(11*(cols-1+rows-1)))*2;
+    agent_entitys.set_dimensions(x, y, map_width, map_height);
+    LOG(LogLevel::DEBUG, "Dimensions: x: %d, y: %d, map_width: %d, map_height: %d", x, y, map_width, map_height);
+    return {map_width, map_height};
+};
 
 RenderAgentTexture RenderAgent::load_texture(const std::string& texture_path) {
     if (DEBUG["all_debug_logs"]) LOG(LogLevel::DEBUG, "Loading Texture %s", texture_path.c_str());
@@ -66,10 +85,9 @@ RenderAgentTexture* RenderAgent::get_texture(const std::string& id, bool suppres
         return &it->second;
     }
 
-    static RenderAgentTexture fallback{};
     if (!suppress_logs)
         LOG(LogLevel::WARNING, "Requested non-existent texture \"%s\"", id.c_str());
-    return &fallback;
+    return nullptr;
 }
 
 bool RenderAgent::add_texture(const std::string& id, const std::string& texture_path) {
@@ -82,9 +100,9 @@ bool RenderAgent::add_sprite(const std::string& id, const std::string& texture_i
     int sprite_width = (width < 0) ? agent_textures[texture_id].width : width;
     int sprite_height = (height < 0) ? agent_textures[texture_id].height: height;
 
-    SDL_FRect srcrect = {static_cast<float>(sprite_x), static_cast<float>(sprite_y), static_cast<float>(sprite_width), static_cast<float>(sprite_height)};
+    SDL_Rect srcrect = {sprite_x, sprite_y, sprite_width, sprite_height};
     agent_sprites[id] = RenderAgentSprite(texture_id, srcrect);
-    LOG(LogLevel::DEBUG, "Added new Sprite %s: srcrect: %f, %f, %f, %f", id.c_str(), agent_sprites[id].texture_rect.x, agent_sprites[id].texture_rect.y, agent_sprites[id].texture_rect.w, agent_sprites[id].texture_rect.h);
+    LOG(LogLevel::DEBUG, "Added new Sprite %s: srcrect: %d, %d, %d, %d", id.c_str(), agent_sprites[id].texture_rect.x, agent_sprites[id].texture_rect.y, agent_sprites[id].texture_rect.w, agent_sprites[id].texture_rect.h);
     return true;
 }
 
@@ -94,16 +112,29 @@ RenderAgentSprite* RenderAgent::get_sprite(const std::string& id, bool suppress_
         return &it->second;
     }
 
-    static RenderAgentSprite fallback{};
     if (!suppress_logs)
         LOG(LogLevel::WARNING, "Requested non-existent sprite \"%s\"", id.c_str());
-    return &fallback;
+    return nullptr;
 }
 
-bool RenderAgent::add_entity(const std::string& id, const std::string& sprite_id, const int& x, const int& y, const int& size, const int& rotation, bool follow_map, bool use_ui_zoom, bool hidden) {
-    agent_entitys.push_back(RenderAgentEntity(id, sprite_id, x, y, size, rotation, follow_map, use_ui_zoom, hidden));
-    if (DEBUG["all_debug_logs"]) LOG(LogLevel::DEBUG, "Added new Entity %s: X: %d, Y: %d, Size: %d, Rotation: %d", id.c_str(), x, y, size, rotation);
-    return true;
+bool RenderAgent::add_entity(const std::string& id, const std::string& sprite_id, const int& x, const int& y, const int& layer, const int& rotation, bool hidden) {
+    const RenderAgentSprite* sprite = get_sprite(sprite_id);
+    if (sprite == nullptr) {
+        LOG(LogLevel::WARNING, "Could not add entity \"%s\": sprite \"%s\" does not exist.", id.c_str(), sprite_id.c_str());
+        return false;
+    }
+    int width = sprite->texture_rect.w;
+    int height = sprite->texture_rect.h;
+    int entity_layer;
+    if (layer == -1) {
+        heighest_layer = heighest_layer+1;
+        entity_layer = heighest_layer;
+    } else {
+        heighest_layer = std::max(heighest_layer, layer);
+        entity_layer = layer;
+    }
+    //LOG(LogLevel::DEBUG, "Added new entity %s: X: %d, Y: %d, layer: %d, rotation: %d", id.c_str(), x, y, entity_layer, rotation);
+    return agent_entitys.insert(id, RenderAgentEntity(id, sprite_id, x, y, width, height, entity_layer, rotation, hidden));
 };
 
 void RenderAgent::render_target() {
@@ -114,7 +145,7 @@ void RenderAgent::render_target() {
     SDL_SetGPURenderState(renderer, NULL);
 }
 
-bool RenderAgent::render(bool clear_renderer, SDL_Color clear_colour) {
+bool RenderAgent::render(const int zoom, const int x_offset, const int y_offset, const bool clear_renderer, const int resolution, SDL_Color clear_colour) {
     if (!dirty)
         return false;
 
@@ -122,7 +153,7 @@ bool RenderAgent::render(bool clear_renderer, SDL_Color clear_colour) {
     if (int(RENDER_SETTINGS["render_mode"]) == 1) {
         // Set target //
         if ((target->w != SCREEN_WIDTH) || (target->h != SCREEN_HEIGHT)) {
-            target = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, SCREEN_WIDTH, SCREEN_HEIGHT);
+            target = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, std::ceil(SCREEN_WIDTH/RENDER_SETTINGS["resolution"]), std::ceil(SCREEN_HEIGHT/RENDER_SETTINGS["resolution"]));
         }
         SDL_SetRenderTarget(renderer, target);
 
@@ -132,72 +163,68 @@ bool RenderAgent::render(bool clear_renderer, SDL_Color clear_colour) {
             SDL_RenderClear(renderer);
         }
 
+        const int screen_x = DEBUG["show_tile_hiding"] ? 100 : 0;
+        const int screen_y = DEBUG["show_tile_hiding"] ? 100 : 0;
+        const int screen_width = (DEBUG["show_tile_hiding"] ? SCREEN_WIDTH-200  : SCREEN_WIDTH);
+        const int screen_height = (DEBUG["show_tile_hiding"] ? SCREEN_HEIGHT-200 : SCREEN_HEIGHT);
+
+        const float inverse_zoom = 1.0f / zoom;
+        const float inverse_resolution = 1.0f / resolution;
+        const int query_x = (int)std::floor(x_offset + screen_x * inverse_zoom * resolution) - 1;
+        const int query_y = (int)std::floor(y_offset + screen_y * inverse_zoom * resolution) - 1;
+        const int query_w = (int)std::ceil(screen_width * inverse_zoom * resolution) + 2;
+        const int query_h = (int)std::ceil(screen_height * inverse_zoom * resolution) + 2;
+
         // Render entitys //
-        for (const RenderAgentEntity& entity : agent_entitys) {
-            if (entity.hidden)
+        std::vector<RenderAgentEntity*> entitys_on_screen;
+        agent_entitys.query(query_x, query_y, query_w, query_h, entitys_on_screen);
+        std::sort(entitys_on_screen.begin(), entitys_on_screen.end(),
+            [](const RenderAgentEntity* a, const RenderAgentEntity* b) {
+                return a->layer < b->layer;
+            }
+        );
+        for (const RenderAgentEntity* entity : entitys_on_screen) {
+            if (entity->hidden)
                 continue;
 
-            int zoom;
-            if (!entity.use_ui_zoom) {
-                zoom = CAMERA.zoom;
-            } else {
-                zoom = UI_ZOOM;
+            const int real_x = (entity->x-x_offset)*zoom * inverse_resolution;
+            const int real_y = (entity->y-y_offset)*zoom * inverse_resolution;
+
+            if (DEBUG["all_debug_logs"])
+                LOG(LogLevel::DEBUG, "Renderring Entity %s at %d;%d", entity->name.c_str(), real_x, real_y);
+
+            // Sprite
+            RenderAgentSprite* sprite = get_sprite(entity->sprite);
+            if (sprite == nullptr)
+                continue;
+            // Texture
+            if ((tex_cache_name == nullptr) || (tex_cache_name != &sprite->texture)) {
+                tex_cache_name = &sprite->texture;
+                tex_cache = get_texture(sprite->texture)->get_texture();
+                if (tex_cache == nullptr)
+                    continue;
             }
-            int real_x;
-            int real_y;
-            if (entity.follow_map) {
-                real_x = (entity.x-CAMERA.x)*zoom;
-                real_y = (entity.y-CAMERA.y)*zoom;
-            } else {
-                real_x = entity.x*zoom;
-                real_y = entity.y*zoom;
-            }
-            if (
-                (real_x > SCREEN_WIDTH*-0.5) &&
-                (real_x < SCREEN_WIDTH*1.5) &&
-                (real_y > SCREEN_HEIGHT*-0.5) &&
-                (real_y < SCREEN_HEIGHT*1.5)
-            ) {
-                if (DEBUG["all_debug_logs"])
-                    LOG(LogLevel::DEBUG, "Renderring Entity %s at %d;%d", entity.name.c_str(), real_x, real_y);
-                if (!(agent_sprites.find(entity.sprite) != agent_sprites.end())) {
-                    LOG(LogLevel::WARNING, "Sprite '%s' not found", entity.sprite.c_str());
-                }
-                const RenderAgentSprite* sprite = get_sprite(entity.sprite);
-                SDL_FRect dstrect = {
-                    (float)real_x,
-                    (float)real_y,
-                    (sprite->texture_rect.w*CAMERA.zoom),
-                    (sprite->texture_rect.h*CAMERA.zoom)
-                };
-                SDL_FRect screen_rect = {
-                    //(float)(DEBUG["show_tile_hiding"] ? 50 : 0),
-                    //(float)(DEBUG["show_tile_hiding"] ? 50 : 0),
-                    //(float)(DEBUG["show_tile_hiding"] ? SCREEN_WIDTH-100  : SCREEN_WIDTH),
-                    //(float)(DEBUG["show_tile_hiding"] ? SCREEN_HEIGHT-100 : SCREEN_HEIGHT)
-                    0.0f,
-                    0.0f,
-                    (float)(SCREEN_WIDTH),
-                    (float)(SCREEN_HEIGHT)
-                };
-                if (SDL_HasRectIntersectionFloat(&dstrect, &screen_rect)) {
-                    // Texture
-                    if (!(agent_textures.find(sprite->texture) != agent_textures.end())) {
-                        LOG(LogLevel::WARNING, "Texture '%s' not found", sprite->texture.c_str());
-                    }
-                    SDL_Texture* texture = agent_textures[sprite->texture].get_texture();
-                    SDL_RenderTexture(renderer, texture, &sprite->texture_rect, &dstrect);
-                }
-            }
+            SDL_FRect src_frect;
+            SDL_FRect dst_frect = {
+                (float)real_x,
+                (float)real_y,
+                (float)sprite->texture_rect.w*zoom * inverse_resolution,
+                (float)sprite->texture_rect.h*zoom * inverse_resolution
+            };
+            SDL_RectToFRect(&sprite->texture_rect, &src_frect);
+            SDL_RenderTexture(renderer, tex_cache, &src_frect, &dst_frect);
         }
 
         // Render text //
-        for (const Text& text : texts) {
+        for (const Text& text : texts) { // TODO: Caching texts to texture
             TTF_DrawRendererText(text.text, text.x, text.y);
         }
 
-        // Render "target" to Window //
-        render_target();
+        // Quadtree renderring
+        if (DEBUG["show_quadtree"]) { // TODO: make into setting
+            agent_entitys.render(renderer, x_offset, y_offset, zoom);
+        }
+        entitys_on_screen.clear();
     }
     dirty = false;
     return true;
@@ -235,11 +262,11 @@ void RenderAgent::drop_texture(const std::string& id) {
 }
 
 RenderAgentEntity* RenderAgent::get_entity(const std::string& id, bool suppress_logs) {
-    for (auto& entity : agent_entitys) {
-        if (entity.name == id) {
-            //LOG(LogLevel::DEBUG, "Found entity %s!", id.c_str());
-            return &entity;
-        }
+    std::vector<RenderAgentEntity*> result;
+    agent_entitys.query_by_id(id, result);
+    if (result.size() > 0) {
+        //LOG(LogLevel::DEBUG, "Found entity %s!", id.c_str());
+        return result[0];
     }
 
     if (!suppress_logs)

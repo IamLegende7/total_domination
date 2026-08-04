@@ -13,6 +13,7 @@ inline void init_debug_settings(std::string config_file) {
     // Renderring //
     DEBUG["show_tile_hiding"] =         Setting(load_setting<bool>(config_file, "Renderring", "show_tile_hiding", false));
     DEBUG["save_texture_atlases"] =     Setting(load_setting<bool>(config_file, "Renderring", "save_texture_atlases", false));
+    DEBUG["show_quadtree"] =            Setting(load_setting<bool>(config_file, "Renderring", "show_quadtree", false));
     // Movement //
     DEBUG["show_coords"] =              Setting(load_setting<bool>(config_file, "Movement", "show_coords", false));
     // HUD //

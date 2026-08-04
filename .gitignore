@@ -15,6 +15,7 @@ data/logs/atlas-*.png
 
 # dev
 .development
+core*
 
 # a 2000x2000 Map too large for github:
 resources/maps/testing/benchmark2.jsonc

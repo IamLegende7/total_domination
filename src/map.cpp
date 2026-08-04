@@ -186,6 +186,7 @@ Map::Map(RenderAgent* agent, const std::string& map_path) {
     }
     const std::string atlas_tile_textures_name = "map:"+map_name+":atlas:tile_textures";
     bake_atlas(agent, atlas_tile_textures_name, tile_texture_names, tile_textures.size());
+    agent->set_dimensions(cols, rows, -(16*(rows-1)), 0); // FIXME: tiles with a large height can be above y=0
 
     // Add entitys //
     for (size_t r = 0; r < rows; ++r) {
@@ -214,18 +215,18 @@ Map::Map(RenderAgent* agent, const std::string& map_path) {
                     agent->add_entity(
                         map_entity_name+":top_tile",
                         current_tile.top_tile,
-                        16*(current_tile.x-current_tile.y),
-                        11*(current_tile.y+current_tile.x)-(16*height_index),
-                        current_tile.size*4
+                        (16*(current_tile.x-current_tile.y)),
+                        (11*(current_tile.y+current_tile.x)-(16*height_index)),
+                        -1
                     );
                 } else {
                     //LOG(LogLevel::DEBUG, "Adding base: %dx%d height: %d", c, r, height_index);
                     agent->add_entity(
                         map_entity_name+":base",
                         current_tile.base,
-                        16*(current_tile.x-current_tile.y),
-                        11*(current_tile.y+current_tile.x)-(16*height_index),
-                        current_tile.size*4
+                        (16*(current_tile.x-current_tile.y)),
+                        (11*(current_tile.y+current_tile.x)-(16*height_index)),
+                        -1
                     );
                 }
             }

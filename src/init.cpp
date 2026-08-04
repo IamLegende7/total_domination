@@ -99,8 +99,10 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
         }
 
         // VSYNC //
-        if (!SDL_SetRenderVSync(RENDERER, 1)) {
-            LOG(LogLevel::ERROR, "VSync could not be enabled: %s", SDL_GetError());
+        if (RENDER_SETTINGS["vsync"]) {
+            if (!SDL_SetRenderVSync(RENDERER, 1)) {
+                LOG(LogLevel::ERROR, "VSync could not be enabled: %s", SDL_GetError());
+            }
         }
     }
     if (int(RENDER_SETTINGS["render_mode"]) == 2) { // TODO

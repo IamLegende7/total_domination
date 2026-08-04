@@ -38,7 +38,7 @@ bool update_selected_tile() {
         selected_tile_right->x = selected_tile_x;
         selected_tile_right->y = selected_tile_y;
         selected_tile_right->hidden = hide_right;
-        SDL_FRect& selected_tile_top_rect = MAIN_RENDER_AGENT->get_sprite(selected_tile_top->sprite)->texture_rect;
+        SDL_Rect& selected_tile_top_rect = MAIN_RENDER_AGENT->get_sprite(selected_tile_top->sprite)->texture_rect;
         CAMERA.x = (selected_tile_top->x+(int)(selected_tile_top_rect.w/2))-(int)((SCREEN_WIDTH/2)/CAMERA.zoom);
         CAMERA.y = (selected_tile_top->y+(int)(selected_tile_top_rect.h/2))-(int)((SCREEN_HEIGHT/2)/CAMERA.zoom);
     }

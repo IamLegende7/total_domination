@@ -110,18 +110,23 @@ SDL_AppResult SDL_AppIterate(void* appState) {
                     };
                     bake_atlas(MAIN_RENDER_AGENT, "atlas:ui", atlas_ui_textures, sizeof(atlas_ui_textures)/sizeof(atlas_ui_textures[0]));
                     MapTile* selected_tile = MAIN_MAP->get_tile(TILE_SELECTION_Y, TILE_SELECTION_X);
-                    const int selected_tile_x = 16*(selected_tile->x-selected_tile->y);
-                    const int selected_tile_y = 11*(selected_tile->x+selected_tile->y)-(16*(selected_tile->height-1));
+                    const int selected_tile_x = (16*(selected_tile->x-selected_tile->y));
+                    const int selected_tile_y = (11*(selected_tile->x+selected_tile->y)-(16*(selected_tile->height-1)));
                     const auto [surrounding_height_top, surrounding_height_bottom, surrounding_height_left, surrounding_height_right] = MAIN_MAP->get_surrounding(TILE_SELECTION_Y, TILE_SELECTION_X);
                     const bool hide_left = (selected_tile->height <= surrounding_height_bottom);
                     const bool hide_right = (selected_tile->height <= surrounding_height_right);
-                    MAIN_RENDER_AGENT->add_entity("selected_tile_top", "td:selected_tile_top", selected_tile_x, selected_tile_y, selected_tile->size*4, 0, true, false, false);
-                    MAIN_RENDER_AGENT->add_entity("selected_tile_left", "td:selected_tile_left", selected_tile_x, selected_tile_y, selected_tile->size*4, 0, true, false, hide_left);
-                    MAIN_RENDER_AGENT->add_entity("selected_tile_right", "td:selected_tile_right", selected_tile_x, selected_tile_y, selected_tile->size*4, 0, true, false, hide_right);
+                    if (!MAIN_RENDER_AGENT->add_entity("selected_tile_top", "td:selected_tile_top", selected_tile_x, selected_tile_y, -1, 0, false))
+                        LOG(LogLevel::ERROR, "Could not add tile \"selected_tile_top\"");
+                    if (!MAIN_RENDER_AGENT->add_entity("selected_tile_left", "td:selected_tile_left", selected_tile_x, selected_tile_y, -1, 0, hide_left))
+                        LOG(LogLevel::ERROR, "Could not add tile \"selected_tile_left\"");
+                    if (!MAIN_RENDER_AGENT->add_entity("selected_tile_right", "td:selected_tile_right", selected_tile_x, selected_tile_y, -1, 0, hide_right))
+                        LOG(LogLevel::ERROR, "Could not add tile \"selected_tile_right\"");
                     RenderAgentEntity* selected_tile_top = MAIN_RENDER_AGENT->get_entity("selected_tile_top");
-                    SDL_FRect& selected_tile_top_rect = MAIN_RENDER_AGENT->get_sprite(selected_tile_top->sprite)->texture_rect;
-                    CAMERA.x = (selected_tile_top->x+(int)(selected_tile_top_rect.w/2))-(int)((SCREEN_WIDTH/2)/CAMERA.zoom);
-                    CAMERA.y = (selected_tile_top->y+(int)(selected_tile_top_rect.h/2))-(int)((SCREEN_HEIGHT/2)/CAMERA.zoom);
+                    if (selected_tile_top != nullptr) {
+                        SDL_Rect& selected_tile_top_rect = MAIN_RENDER_AGENT->get_sprite(selected_tile_top->sprite)->texture_rect;
+                        CAMERA.x = (selected_tile_top->x+(int)(selected_tile_top_rect.w/2))-(int)((SCREEN_WIDTH/2)/CAMERA.zoom);
+                        CAMERA.y = (selected_tile_top->y+(int)(selected_tile_top_rect.h/2))-(int)((SCREEN_HEIGHT/2)/CAMERA.zoom);
+                    }
                     MAIN_RENDER_AGENT->dirty = true;
                     UI_RENDER_AGENT->dirty = true;
                 }
@@ -142,11 +147,9 @@ SDL_AppResult SDL_AppIterate(void* appState) {
     } else if (MODE == 1) {
         bool changed_main;
         bool changed_ui;
-        changed_main = MAIN_RENDER_AGENT->render(true);
-        changed_ui = UI_RENDER_AGENT->render(true, {0, 0, 0, 0});
-        if (changed_main && !changed_ui) {
-            UI_RENDER_AGENT->render_target();
-        } else if (!changed_main && changed_ui) {
+        changed_main = MAIN_RENDER_AGENT->render(CAMERA.zoom, CAMERA.x, CAMERA.y, true, RENDER_SETTINGS["resolution"]);
+        changed_ui = UI_RENDER_AGENT->render(UI_ZOOM, 0, 0, true, RENDER_SETTINGS["resolution"], {0, 0, 0, 0}); // TODO: Only overwrite the area of target tex of the old text if the text changes, not the whole target tex
+        if (changed_main || changed_ui) {
             MAIN_RENDER_AGENT->render_target();
             UI_RENDER_AGENT->render_target();
         }
@@ -177,8 +180,8 @@ SDL_AppResult SDL_AppEvent(void* appState, SDL_Event* event) {
             CRTEffectUniforms uniforms;
             SDL_zero(uniforms);
             LOG(LogLevel::DEBUG, "Window Width: %d, Height: %d", SCREEN_WIDTH, SCREEN_HEIGHT);
-            uniforms.texture_width = SCREEN_WIDTH;
-            uniforms.texture_height = SCREEN_HEIGHT;
+            uniforms.texture_width = std::ceil(SCREEN_WIDTH/RENDER_SETTINGS["resolution"]);
+            uniforms.texture_height = std::ceil(SCREEN_HEIGHT/RENDER_SETTINGS["resolution"]);
             if (!SDL_SetGPURenderStateFragmentUniforms(RENDER_STATES[CURRENT_RENDER_STATE].state, 0, &uniforms, sizeof(uniforms))) {
                 SDL_Log("Couldn't set uniform data: %s", SDL_GetError());
                 CURRENT_RENDER_STATE = 0;

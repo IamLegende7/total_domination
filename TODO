@@ -1,4 +1,4 @@
-FIXME: low framerate after this commit ()
+TODO: cache text in a SDL_Texture
 TODO: Add software renderring
 TODO: mouse inputs
 TODO: gamepad inputs

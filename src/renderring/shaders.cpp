@@ -161,7 +161,7 @@ bool add_renderer_render_state(SDL_Renderer* renderer, const std::string& filena
         return false;
     }
 
-    if (filename == "resources/shaders/basic_CRT.frag.hlsl") { // TODO: Make automatic somehow
+    if (filename == "resources/shaders/CRT.frag.hlsl") { // TODO: Make automatic somehow
         CRTEffectUniforms uniforms;
         SDL_zero(uniforms);
         uniforms.texture_width = SCREEN_WIDTH;
