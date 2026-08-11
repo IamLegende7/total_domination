@@ -5,6 +5,7 @@
 #include <vector>
 #include <set>
 #include <tuple>
+#include <filesystem>
 #include "rapidjson/document.h"
 #include "rapidjson/rapidjson.h"
 
@@ -36,7 +37,7 @@ class Map {
         bool load_row(const rapidjson::GenericValue<rapidjson::UTF8<>>& row_json, const size_t row, std::set<std::string>& tile_textures);
     public:
         std::string map_name;
-        std::string map_path;
+        std::filesystem::path map_path;
         std::string map_description;
         size_t rows;
         size_t cols;
@@ -45,7 +46,7 @@ class Map {
         MapTile* get_tile(const int row, const int col, const bool suppress_logs=false);
 
         // INIT & CLEANUP //
-        Map(RenderAgent* agent, const std::string& map_path);
+        Map(RenderAgent* agent, const std::filesystem::path& map_path);
         ~Map();
 };
 

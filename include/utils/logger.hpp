@@ -6,6 +6,7 @@
 #include <sstream>
 #include <cstdarg>
 #include <SDL3/SDL.h>
+#include <filesystem>
 
 // Log rotation
 #include <cstdio>
@@ -18,12 +19,13 @@
 // LOGGING //
 /////////////
 
+// Windows is stupid
 enum class LogLevel {
-    DEBUG,
-    INFO,
-    WARNING,
-    ERROR,
-    CRITICAL
+    Debug,
+    Info,
+    Warning,
+    Error,
+    Critical
 };
 
 class Logger {
@@ -39,7 +41,7 @@ class Logger {
             }
         }
 
-        void log(const char* file, const char* func, LogLevel level, const char* format, ...) {
+        void log(const std::filesystem::path& file, const char* func, LogLevel level, const char* format, ...) {
             std::ostringstream oss;
                 va_list args;
                 va_start(args, format);
@@ -58,23 +60,23 @@ class Logger {
             std::string prefix;
             std::string color_code;
             switch (level) {
-                    case LogLevel::DEBUG:
+                    case LogLevel::Debug:
                         prefix = "DEBUG   ";
                         color_code = "\033[32m"; // Green
                         break;
-                    case LogLevel::INFO:     
+                    case LogLevel::Info:     
                         prefix = "INFO    ";
                         color_code = "\033[37m"; // White
                         break;
-                    case LogLevel::WARNING:
+                    case LogLevel::Warning:
                         prefix = "WARNING ";
                         color_code = "\033[33m"; // Yellow
                         break;
-                    case LogLevel::ERROR:
+                    case LogLevel::Error:
                         prefix = "ERROR   ";
                         color_code = "\033[31m"; // Red
                         break;
-                    case LogLevel::CRITICAL:
+                    case LogLevel::Critical:
                         prefix = "CRITICAL";
                         color_code = "\033[41;37m"; // Red background with white text
                         break;
@@ -93,8 +95,8 @@ class Logger {
             timeStream << seconds << '.' << std::setfill('0') << std::setw(3) << milliseconds;
 
             std::string timestamp = timeStream.str();
-            std::string full_log        = prefix + ": [" + timestamp + "]" + "[" + std::string(base_name(file)) + ":" + std::string(func) + "] " + message;
-            std::string full_log_colour = color_code + prefix + "\033[0m" + ": [" + timestamp + "]" + "[" + std::string(base_name(file)) + ":" + std::string(func) + "] " + message;
+            std::string full_log        = prefix + ": [" + timestamp + "]" + "[" + file.filename().string() + ":" + std::string(func) + "] " + message;
+            std::string full_log_colour = color_code + prefix + "\033[0m" + ": [" + timestamp + "]" + "[" + file.filename().string() + ":" + std::string(func) + "] " + message;
 
             if (log_file.is_open()) {
                 log_file << full_log << std::endl;  
@@ -102,14 +104,15 @@ class Logger {
             SDL_Log("%s", full_log_colour.c_str());
         }
 
-        bool set_logfile(const std::string& filename) {
-            remove(filename.c_str());
+        bool set_logfile(const std::filesystem::path& filename) {
+            const std::string filename_str = filename.u8string();
+            SDL_RemovePath(filename_str.c_str());
             log_file.open(filename, std::ios::out | std::ios::app);
             if (!log_file.is_open()) {
-                SDL_Log("\033[31mERROR\033[0m: Could not open log file: %s", filename.c_str());
+                SDL_Log("\033[31mERROR\033[0m: Could not open log file: %s", filename_str.c_str());
                 return false;
             }
-            log_file << "--- Cleared and Set log file to " << filename << " ---"<< std::endl;
+            log_file << "--- Cleared and Set log file to " << filename_str << " ---"<< std::endl;
             return true;
         }
 
@@ -117,11 +120,6 @@ class Logger {
         std::ofstream log_file;
         std::chrono::steady_clock::time_point start_time;
         std::chrono::steady_clock::time_point previous_time;
-        const char* base_name(const char* path) {
-            const char* p = strrchr(path, '/');
-            if (!p) p = strrchr(path, '\\');
-            return p ? p+1 : path;
-        }
 };
 
 inline Logger LOGGER;

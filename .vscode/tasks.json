@@ -52,6 +52,22 @@
             "problemMatcher": []
         },
         {
+            "label": "compile [Windows]",
+            "type": "shell",
+            "command": "bash build.sh -d --clean --download -w --no-show-warning -p",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared",
+                "showReuseMessage": true
+            },
+            "problemMatcher": []
+        },
+        {
             "label": "run",
             "type": "shell",
             "command": "bash bin/run.sh",

@@ -11,8 +11,9 @@ do_cleanup=false
 show_warning=true
 compile_shaders=false
 download_submodules=false
+compile_for_windows=false
 
-OPTIONS=$(getopt -o c,p,d,h,s --long clean,auto-package,no-install-deps,cleanup,help,no-show-warning,offline-shaders,download -- "$@")
+OPTIONS=$(getopt -o c,p,d,h,s,w --long clean,auto-package,no-install-deps,cleanup,help,no-show-warning,offline-shaders,download,windows -- "$@")
 eval set -- "$OPTIONS"
 while true; do
   case "$1" in
@@ -44,6 +45,10 @@ while true; do
       download_submodules=true
       shift
       ;;
+    -w|--windows)
+      compile_for_windows=true
+      shift
+      ;;
     --)
       shift
       break
@@ -58,6 +63,7 @@ while true; do
       echo "[--no-show-warning]    Don't show the 'Has only been tested on arch' warning"
       echo "[-s|--offline-shaders] Precompile shaders"
       echo "[--download]           Run lib/download.sh before building. Omit if you used 'git clone --recursive' or manually ran lib/download.sh."
+      echo "[-w|--windows]         Cross-compile for windows."
       exit 1
       ;;
     *) 
@@ -102,7 +108,7 @@ fi
 
 if [ "$download_submodules" = true ]; then
     echo "Downloading Submodules (libraries).."
-    ./lib/download.sh
+    git submodule update --init --recursive
     echo "Done!"
 fi
 
@@ -119,11 +125,19 @@ mkdir -p bin/lib
 mkdir -p build
 
 ## Build ##
-cmake -B build
-cmake --build build #--config Release
+if [ "$compile_for_windows" = false ]; then
+    cmake -S . -B build
+    cmake --build build #--config Release
+    rm -f bin/lib/*.a
+else 
+    cmake -B build -DCMAKE_TOOLCHAIN_FILE=toolchain-mingw64.cmake
+    cmake --build build
+    mv bin/lib/*.dll bin/
+    rm -rf bin/lib
+fi
 
-cp ./build/lib/SDL_shadercross/external/DirectXShaderCompiler/lib/libdxcompiler.so* ./bin/lib/
-cp build/lib/SDL_shadercross/shadercross bin/
+cp build/lib/SDL_shadercross/shadercross bin/ \
+ || cp build/lib/SDL_shadercross/shadercross.exe bin/
 
 cp resources/build/run.sh bin/
 cp resources/build/package.sh bin/
@@ -131,7 +145,7 @@ cp resources/build/RELEASE_README.md bin/README.md
 
 cp resources/build/cleanup.sh build/
 
-echo "Succsessfully build Sentinel."
+echo "Succsessfully build Total Domination."
 if [ "$auto_package" = false ]; then
     echo "Execute by running bin/run.sh."
 fi
@@ -167,7 +181,11 @@ fi
 ## Packaging
 if [ "$auto_package" = true ]; then
     echo "Packaging sentinel.."
-    ./bin/package.sh --cleanup
+    if [ "$compile_for_windows" = false ]; then
+        ./bin/package.sh --cleanup
+    else 
+        ./bin/package.sh --cleanup --zip -n total_domination-windows --windows
+fi
     echo "Done!"
 fi
 

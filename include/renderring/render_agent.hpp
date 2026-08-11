@@ -8,6 +8,7 @@
 #include <string>
 #include <tuple>
 #include <memory>
+#include <filesystem>
 
 #include "main.hpp"
 #include "ui.hpp"
@@ -70,14 +71,14 @@ struct RenderAgentEntity {
 
 struct TextureConstructor {
     std::string name;
-    std::string file;
+    std::filesystem::path file;
     int x, y;
     int size;
     RenderAgentTexture* texture;
 
     TextureConstructor()
-        : name("td:missing"), file(LOCATIONS["missing_texture_tile"]), x(0), y(0), size(10) {};
-    TextureConstructor(std::string name, std::string file, int x, int y, int size=1)
+        : name("td:missing"), file(LOCATIONS["missing_texture_tile"].get<std::filesystem::path>()), x(0), y(0), size(10) {};
+    TextureConstructor(std::string name, std::filesystem::path file, int x, int y, int size=1)
         : name(name), file(file), x(x), y(y), size(size) {};
 };
 
@@ -107,8 +108,8 @@ class RenderAgent {
         void render_target();
 
         // Textures
-        bool add_texture(const std::string& id, const std::string& texture_path);
-        RenderAgentTexture load_texture(const std::string& texture_path);
+        bool add_texture(const std::string& id, const std::filesystem::path& texture_path);
+        RenderAgentTexture load_texture(const std::filesystem::path& texture_path);
         bool insert_texture(const std::string& id, RenderAgentTexture texture);
         bool texture_exists(const std::string& id);
         RenderAgentTexture* get_texture(const std::string& id, bool suppress_logs=false);
@@ -126,7 +127,7 @@ class RenderAgent {
         // Text
         TTF_Font* get_font(const std::string& font_name, bool suppress_logs=false);
         Text* get_text(const std::string& id, bool suppress_logs=false);
-        bool add_font(const std::string& font_name, const std::string& font_path, const float font_size);
+        bool add_font(const std::string& font_name, const std::filesystem::path& font_path, const float font_size);
         bool add_text(const std::string& id, const std::string& content, const std::string& font_name, const int x, const int y, const SDL_Color colour = {255, 255, 255, 255});
 };
 

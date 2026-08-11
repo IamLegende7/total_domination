@@ -6,6 +6,7 @@
 #include <SDL3_shadercross/SDL_shadercross.h>
 
 #include <string>
+#include <filesystem>
 
 #include "callback_functions.hpp"
 
@@ -24,10 +25,10 @@
 #include "renderring/shaders.hpp"
 
 bool load_settings() {
-    init_locations_settings("data/config/locations.ini"); /* Not really ideal */
-    init_debug_settings(std::string(LOCATIONS["config_dir"]) + "/debug.ini");
-    init_main_settings(std::string(LOCATIONS["config_dir"]) + "/main.ini");
-    init_render_settings(std::string(LOCATIONS["config_dir"]) + "/render.ini");
+    init_locations_settings(std::filesystem::path(SDL_GetCurrentDirectory()) / std::filesystem::path("data/config/locations.ini")); /* Not really ideal */
+    init_debug_settings(LOCATIONS["config_dir"].get<std::filesystem::path>() / "debug.ini");
+    init_main_settings(LOCATIONS["config_dir"].get<std::filesystem::path>() / "main.ini");
+    init_render_settings(LOCATIONS["config_dir"].get<std::filesystem::path>() / "render.ini");
     return true;
 }
 
@@ -42,32 +43,32 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_TYPE_STRING, "game");
 
     // SETTINGS //
-    LOG(LogLevel::INFO, "Loading Settings");
+    LOG(LogLevel::Info, "Loading Settings");
     load_settings();
 
     // LOGGER //
-    LOGGER.set_logfile(LOCATIONS["log_file"]); // Logger function has its own error handling
+    LOGGER.set_logfile(LOCATIONS["log_file"].get<std::filesystem::path>()); // Logger function has its own error handling
 
     // SDL //
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
-        LOG(LogLevel::CRITICAL, "SDL could not initialize: %s", SDL_GetError());
+        LOG(LogLevel::Critical, "SDL could not initialize: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     } else {
-        LOG(LogLevel::INFO, "SDL initialized successfully.");
+        LOG(LogLevel::Info, "SDL initialized successfully.");
     }
 
     // SDL_ttf init //
     if (!TTF_Init()) {
-        LOG(LogLevel::CRITICAL, "SDL_ttf could not initialize: %s", SDL_GetError());
+        LOG(LogLevel::Critical, "SDL_ttf could not initialize: %s", SDL_GetError());
         STATUS_TTF_LOADED = false;
     }
 
     // SDL_shadercross init //
-    if (RENDER_SETTINGS["online_shaders"]) {
-        LOG(LogLevel::INFO, "Initializing SDL_shadercross..");
+    if (RENDER_SETTINGS["online_shaders"].get<bool>()) {
+        LOG(LogLevel::Info, "Initializing SDL_shadercross..");
         if (!SDL_ShaderCross_Init()) {
-            LOG(LogLevel::ERROR, "SDL_ShaderCross_Init failed: %s", SDL_GetError());
-            LOG(LogLevel::WARNING, "Online shader compilation disabled.");
+            LOG(LogLevel::Error, "SDL_ShaderCross_Init failed: %s", SDL_GetError());
+            LOG(LogLevel::Warning, "Online shader compilation disabled.");
             STATUS_SHADERCROSS_LOADED = false;
         } else {
             STATUS_SHADERCROSS_LOADED = true;
@@ -79,40 +80,40 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
     std::string windowTitle = INFO_NAME + " - " + INFO_VERSION.toString();
     WINDOW = SDL_CreateWindow(windowTitle.c_str(), SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_RESIZABLE);
     if (WINDOW == NULL) {
-        LOG(LogLevel::CRITICAL, "Window could not be created: %s", SDL_GetError());
+        LOG(LogLevel::Critical, "Window could not be created: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
 
-    if ((int(RENDER_SETTINGS["render_mode"]) > 2) || (int(RENDER_SETTINGS["render_mode"]) < 1)) {
-        LOG(LogLevel::CRITICAL, "Invalid render_mode \"%d\".", int(RENDER_SETTINGS["render_mode"]));
+    if ((RENDER_SETTINGS["render_mode"].get<int>() > 2) || (RENDER_SETTINGS["render_mode"].get<int>() < 1)) {
+        LOG(LogLevel::Critical, "Invalid render_mode \"%d\".", RENDER_SETTINGS["render_mode"].get<int>());
         return SDL_APP_FAILURE;
     }
 
-    if (int(RENDER_SETTINGS["render_mode"]) == 1) {
+    if (RENDER_SETTINGS["render_mode"].get<int>() == 1) {
         // RENDERER //
         RENDERER = SDL_CreateRenderer(WINDOW, SDL_GPU_RENDERER);
         if (RENDERER == NULL) {
-            LOG(LogLevel::ERROR, "Renderer could not be created: %s", SDL_GetError());
-            LOG(LogLevel::WARNING, "Falling back to software renderer..");
+            LOG(LogLevel::Error, "Renderer could not be created: %s", SDL_GetError());
+            LOG(LogLevel::Warning, "Falling back to software renderer..");
             STATUS_FORCED_RENDERMODE = 2;
-            RENDER_SETTINGS["render_mode"].set(2);
+            RENDER_SETTINGS["render_mode"].set<int>(2);
         }
 
         // VSYNC //
-        if (RENDER_SETTINGS["vsync"]) {
+        if (RENDER_SETTINGS["vsync"].get<bool>()) {
             if (!SDL_SetRenderVSync(RENDERER, 1)) {
-                LOG(LogLevel::ERROR, "VSync could not be enabled: %s", SDL_GetError());
+                LOG(LogLevel::Error, "VSync could not be enabled: %s", SDL_GetError());
             }
         }
     }
-    if (int(RENDER_SETTINGS["render_mode"]) == 2) { // TODO
-        LOG(LogLevel::CRITICAL, "Software Renderer not implemented!");
+    if (RENDER_SETTINGS["render_mode"].get<int>() == 2) { // TODO
+        LOG(LogLevel::Critical, "Software Renderer not implemented!");
         return SDL_APP_FAILURE;
     }
 
     // SOFTWARE RENDERRING WARNING //
-    if (int(RENDER_SETTINGS["render_mode"]) == 2) {
-        LOG(LogLevel::WARNING, "Using software renderring");
+    if (RENDER_SETTINGS["render_mode"].get<int>() == 2) {
+        LOG(LogLevel::Warning, "Using software renderring");
     }
 
     // Render Agents //
@@ -120,53 +121,56 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
     UI_RENDER_AGENT = new RenderAgent(RENDERER, true);
 
     // Window icon //
-    std::string icon_path = std::string(LOCATIONS["resource_dir"]) + "/icons/icon.png";
-    SDL_Surface* icon = IMG_Load(icon_path.c_str());
+    std::filesystem::path icon_path = LOCATIONS["resource_dir"].get<std::filesystem::path>() / "icons/icon.png";
+    const std::string icon_path_str = icon_path.u8string();
+    LOG(LogLevel::Debug, "icon_path: \"%s\"", icon_path_str.c_str());
+    SDL_Surface* icon = IMG_Load(icon_path_str.c_str());
     if ( !SDL_SetWindowIcon(WINDOW, icon) ) {
-        LOG(LogLevel::WARNING, "Windowicon could not be set: %s", SDL_GetError());
+        LOG(LogLevel::Warning, "Windowicon could not be set: %s", SDL_GetError());
     }
 
     // Inputs //
     INPUTS = new InputHandler();
 
     // Shader loading //
-    CURRENT_RENDER_STATE = set_render_state(RENDERER, RENDER_SETTINGS["shader"].get_str(), RENDER_STATES);
+    CURRENT_RENDER_STATE = set_render_state(RENDERER, RENDER_SETTINGS["shader"].get<std::filesystem::path>(), RENDER_STATES);
 
     // TTF font loading //
-    UI_RENDER_AGENT->add_font("def_font", SETTINGS["font"].get_str(), (float)(SETTINGS["font_size"]/10));
+    UI_RENDER_AGENT->add_font("def_font", SETTINGS["font"].get<std::filesystem::path>(), (float)(SETTINGS["font_size"].get<int>()/10));
 
-    LOG(LogLevel::INFO, "Setup all done!");
+    LOG(LogLevel::Info, "Setup all done!");
 
     // TESTS //
-    LOG(LogLevel::INFO, "Running tests..");
-    if (DEBUG["test_logger"]) {
-        LOG(LogLevel::DEBUG,    "Testing Logger");
-        LOG(LogLevel::INFO,     "Testing Logger");
-        LOG(LogLevel::WARNING,  "Testing Logger");
-        LOG(LogLevel::ERROR,    "Testing Logger");
-        LOG(LogLevel::CRITICAL, "Testing Logger");
+    LOG(LogLevel::Info, "Running tests..");
+    if (DEBUG["test_logger"].get<bool>()) {
+        LOG(LogLevel::Debug,    "Testing Logger");
+        LOG(LogLevel::Info,     "Testing Logger");
+        LOG(LogLevel::Warning,  "Testing Logger");
+        LOG(LogLevel::Error,    "Testing Logger");
+        LOG(LogLevel::Critical, "Testing Logger");
     }
 
-    // Test.png //
-    //LOG(LogLevel::DEBUG, "Loading test.png...");
-    //MAIN_RENDER_AGENT->add_texture("test_texture", LOCATIONS["texture_dir"].get_str()+"/test.png");
-    //MAIN_RENDER_AGENT->add_sprite("test_sprite", "test_texture", 0, 0, 32, 32);
-    //MAIN_RENDER_AGENT->add_entity("test_entity", "test_sprite", 0, 0, 4);
+    if (DEBUG["print_locations"].get<bool>()) {
+        for (auto& [key, setting] : LOCATIONS) {
+            std::string current_value_str = setting.get<std::filesystem::path>().u8string();
+            LOG(LogLevel::Debug, "%s: \"%s\"", key.c_str(), current_value_str.c_str());
+        }
+    }
 
-    LOG(LogLevel::INFO, "All good; have fun!");
+    LOG(LogLevel::Info, "All good; have fun!");
     return SDL_APP_CONTINUE;
 }
 
 
 
-std::string crash_handler() {
+std::filesystem::path crash_handler() {
     SDL_Time* current_time = new SDL_Time();
     if (!SDL_GetCurrentTime(current_time)) {
-        LOG(LogLevel::ERROR, "Could not get local time: %s", SDL_GetError());
+        LOG(LogLevel::Error, "Could not get local time: %s", SDL_GetError());
     }
     SDL_DateTime* current_date_time = new SDL_DateTime();
     if (!SDL_TimeToDateTime(*current_time, current_date_time, true)) {
-        LOG(LogLevel::ERROR, "Could not convert time to date time: %s", SDL_GetError());
+        LOG(LogLevel::Error, "Could not convert time to date time: %s", SDL_GetError());
     }
 
     std::ostringstream crash_file_name_stream;
@@ -175,31 +179,35 @@ std::string crash_handler() {
     delete current_time;
     delete current_date_time;
 
-    if (!SDL_GetPathInfo(LOCATIONS["log_crash_dir"].get_c_str(), NULL)) {
-        if (!SDL_CreateDirectory(LOCATIONS["log_crash_dir"].get_c_str())) {
-            LOG(LogLevel::ERROR, "Could not create the crash-log directory %s: %s", LOCATIONS["log_crash_dir"].get_c_str(), SDL_GetError());
-            return LOCATIONS["log_file"].get_str();
+    std::string log_crash_dir_str = LOCATIONS["log_crash_dir"].get<std::filesystem::path>().u8string();
+    if (!SDL_GetPathInfo(log_crash_dir_str.c_str(), NULL)) {
+        if (!SDL_CreateDirectory(log_crash_dir_str.c_str())) {
+            LOG(LogLevel::Error, "Could not create the crash-log directory %s: %s", log_crash_dir_str.c_str(), SDL_GetError());
+            return LOCATIONS["log_file"].get<std::filesystem::path>();
         }
     }
-    std::string new_file_path = LOCATIONS["log_crash_dir"].get_str() + "/" + crash_file_name;
-    if (!SDL_CopyFile(LOCATIONS["log_file"].get_c_str(), new_file_path.c_str())) {
-        LOG(LogLevel::ERROR, "Could not copy %s to %s: %s", LOCATIONS["log_file"].get_c_str(), new_file_path.c_str(), SDL_GetError());
-        return LOCATIONS["log_file"].get_str();
+    std::filesystem::path new_file_path = LOCATIONS["log_crash_dir"].get<std::filesystem::path>() / crash_file_name;
+    std::string new_file_path_str = new_file_path.u8string();
+    std::string log_file_path_str = LOCATIONS["log_file"].get<std::filesystem::path>().u8string();
+    if (!SDL_CopyFile(log_file_path_str.c_str(), new_file_path_str.c_str())) {
+        LOG(LogLevel::Error, "Could not copy %s to %s: %s", log_file_path_str.c_str(), new_file_path_str.c_str(), SDL_GetError());
+        return log_file_path_str;
     }
-    SDL_RemovePath(LOCATIONS["log_file"].get_c_str());
+    SDL_RemovePath(log_file_path_str.c_str());
 
     return new_file_path;
 }
 
 void quit(void *appstate, SDL_AppResult result) {
     if (result == SDL_APP_FAILURE) {
-        std::string crash_log_file = crash_handler();
-        const std::string crash_message = "It seems this application has crashed! See \""+crash_log_file+"\" for more details";
-        LOG(LogLevel::CRITICAL, "%s", crash_message.c_str());
+        std::filesystem::path crash_log_file = crash_handler();
+        const std::string crash_log_file_str = crash_log_file.u8string();
+        const std::string crash_message = "It seems this application has crashed! See \""+crash_log_file_str+"\" for more details";
+        LOG(LogLevel::Critical, "%s", crash_message.c_str());
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "TD Chrash-Handler", crash_message.c_str(), NULL);
     }
 
-    LOG(LogLevel::INFO, "Cleaning up");
+    LOG(LogLevel::Info, "Cleaning up");
 
     delete MAIN_MAP;
     delete MAIN_RENDER_AGENT;

@@ -73,7 +73,7 @@ namespace TDKeybind {
         }
     }
     void reload() {
-        LOG(LogLevel::INFO, "Reloading Settings...");
+        LOG(LogLevel::Info, "Reloading Settings...");
         load_settings();
     }
 }

@@ -5,6 +5,7 @@
 // general
 #include <string>
 #include <variant>
+#include <filesystem>
 
 #include "utils/logger.hpp"
 
@@ -16,42 +17,14 @@
 #include <type_traits>
 
 // for storing settings
-#include <unordered_map>
+#include <map>
 
 // TODO: rewrite
 
 // Setting class //
 class Setting {
     public:
-        using SettingType = std::variant<bool, int, std::string>;
-
-        // based off https://devblogs.microsoft.com/oldnewthing/20191106-00/?p=103066
-        operator bool() const {
-            try {
-                return std::get<bool>(value);
-            } catch (const std::bad_variant_access&) {
-                LOG(LogLevel::ERROR, "Type mismatch: Expected bool, returning default false.");
-                return false;
-            }
-        }
-
-        operator int() const {
-            try {
-                return std::get<int>(value);
-            } catch (const std::bad_variant_access&) {
-                LOG(LogLevel::ERROR, "Type mismatch: Expected int, returning default 0.");
-                return 0;
-            } 
-        }
-
-        operator std::string() const {
-            try {
-                return std::get<std::string>(value);
-            } catch (const std::bad_variant_access&) {
-                LOG(LogLevel::ERROR, "Type mismatch: Expected std::string, returning default empty string.");
-                return "";
-            }
-        }
+        using SettingType = std::variant<bool, int, std::string, std::filesystem::path>;
 
         Setting() {}
 
@@ -64,20 +37,30 @@ class Setting {
         };
 
         // Some functions for convienient calling //
-        std::string get_str() {
+        template<typename T>
+        T get() {
+            try {
+                return std::get<T>(value);
+            } catch (const std::bad_variant_access&) {
+                LOG(LogLevel::Error, "Type mismatch: Expected \"%s\", returning default.", typeid(T).name());
+                return T{};
+            }
+        }
+
+        std::string str() {
             try {
                 return std::get<std::string>(value);
             } catch (const std::bad_variant_access&) {
-                LOG(LogLevel::ERROR, "Type mismatch: Expected std::string, returning default empty string.");
+                LOG(LogLevel::Error, "Type mismatch: Expected \"std::string\", returning default empty string.");
                 return "";
             }
         }
 
-        const char* get_c_str() {
+        const char* c_str() {
             try {
                 return std::get<std::string>(value).c_str();
             } catch (const std::bad_variant_access&) {
-                LOG(LogLevel::ERROR, "Type mismatch: Expected const char*, returning default empty string.");
+                LOG(LogLevel::Error, "Type mismatch: Expected const \"char*\", returning default empty string.");
                 return "";
             }
         }
@@ -87,13 +70,14 @@ class Setting {
 };
 
 template<typename T>
-inline T load_setting(std::string file, std::string section, std::string name, const T default_value = T()) {
+inline T load_setting(std::filesystem::path file, const std::string& section, const std::string& name, const T default_value = T{}) {
     CSimpleIniA ini;
 	ini.SetUnicode();
 
-    SI_Error rc = ini.LoadFile(file.c_str());
+    const std::string file_str = file.u8string();
+    SI_Error rc = ini.LoadFile(file_str.c_str());
     if (rc < 0) {
-        LOG(LogLevel::ERROR, "Could not load ini File %s", file.c_str());
+        LOG(LogLevel::Error, "Could not load ini file \"%s\".", file_str.c_str());
         return T();
     }
 
@@ -103,7 +87,7 @@ inline T load_setting(std::string file, std::string section, std::string name, c
 
     const char* loaded_value = ini.GetValue(section.c_str(), name.c_str(), default_value_string.c_str());
     if (!loaded_value) {
-        LOG(LogLevel::WARNING, "Key %s not found in section %s", name.c_str(), section.c_str());
+        LOG(LogLevel::Warning, "Key %s not found in section %s", name.c_str(), section.c_str());
         return T();
     }
 
@@ -112,10 +96,12 @@ inline T load_setting(std::string file, std::string section, std::string name, c
         result = std::string(loaded_value);
     } else if constexpr(std::is_same<T, int>::value) {
         result = std::stoi(std::string(loaded_value));
-    } else if constexpr(std::is_same<T, bool>::value){
+    } else if constexpr(std::is_same<T, bool>::value) {
         result = (std::strcmp(loaded_value, "true") == 0 || std::strcmp(loaded_value, "1") == 0);
+    } else if constexpr(std::is_same<T, std::filesystem::path>::value) {
+        result = std::filesystem::path(loaded_value);
     } else {
-        LOG(LogLevel::ERROR, "Could not convert value to type T for key %s", name.c_str());
+        LOG(LogLevel::Error, "Could not convert value to type \"%s\" for key %s", typeid(T).name(), name.c_str());
         result = T();
     }
 

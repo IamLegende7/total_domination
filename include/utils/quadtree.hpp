@@ -20,12 +20,12 @@ class QuadtreeNode {
 
         bool subdivide() {
             if (node_capacity == 0) {
-                LOG(LogLevel::ERROR, "Node capacity unset!");
+                LOG(LogLevel::Error, "Node capacity unset!");
                 return false;
             }
             if ((width < 1) || (height < 1))
                 return false;
-            //LOG(LogLevel::DEBUG, "Subdividing");
+            //LOG(LogLevel::Debug, "Subdividing");
             int child_width  = width / 2;
             int child_height = height / 2;
 
@@ -161,7 +161,6 @@ class QuadtreeNode {
             return true;
         };
 
-        // FIXME: broken
         bool render(SDL_Renderer* renderer, const int x_offset, const int y_offset, const int zoom, const SDL_Color& colour={200, 30, 210, 255}) { // TODO: don't render outside of view
             SDL_FRect rect = {
                 (float)(x - x_offset) * zoom,

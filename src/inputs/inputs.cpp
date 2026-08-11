@@ -6,6 +6,7 @@
 //#include <SDL3/SDL_gamepad.h>
 #include <string>
 #include <vector>
+#include <filesystem>
 #include <SimpleIni.h>
 
 #include "utils/logger.hpp"
@@ -21,20 +22,21 @@
 
 
 InputHandler::InputHandler() {
-    load_keybinds(LOCATIONS["config_dir"].get_str() + "/keybinds.ini");
+    load_keybinds(LOCATIONS["config_dir"].get<std::filesystem::path>() / "keybinds.ini");
 }
 
 InputHandler::~InputHandler() {
 
 }
 
-bool InputHandler::load_keybinds(const std::string& filename) {
+bool InputHandler::load_keybinds(const std::filesystem::path& filename) {
     CSimpleIniA ini;
 	ini.SetUnicode();
 
-    SI_Error rc = ini.LoadFile(filename.c_str());
+    const std::string filename_str = filename.u8string();
+    SI_Error rc = ini.LoadFile(filename_str.c_str());
     if (rc < 0) {
-        LOG(LogLevel::ERROR, "Could not load ini file %s", filename.c_str());
+        LOG(LogLevel::Error, "Could not load ini file \"%s\"", filename_str.c_str());
         return false;
     }
 
@@ -43,7 +45,7 @@ bool InputHandler::load_keybinds(const std::string& filename) {
         SDL_Scancode scancode;
         const char* keyname = ini.GetValue(constructor.category.c_str(), constructor.id.c_str());
         if (!keyname) {
-            LOG(LogLevel::WARNING, "Key %s not found in section %s", constructor.id.c_str(), constructor.category.c_str());
+            LOG(LogLevel::Warning, "Key %s not found in section %s", constructor.id.c_str(), constructor.category.c_str());
             scancode = constructor.scancode;
         } else {
             scancode = SDL_GetScancodeFromName(keyname); // TODO: make own SDL_Scancode <-> string mapping
@@ -54,7 +56,7 @@ bool InputHandler::load_keybinds(const std::string& filename) {
 }
 
 bool InputHandler::update(SDL_Event* event) {
-    if (SETTINGS["input_mode"] == 0) {
+    if (SETTINGS["input_mode"].get<int>() == 0) {
         if (event->type == SDL_EVENT_KEY_DOWN) {
             if (keyboard_state[event->key.scancode] == 0)
                 keyboard_state[event->key.scancode] = -2;
@@ -68,11 +70,11 @@ bool InputHandler::update(SDL_Event* event) {
 }
 
 bool InputHandler::process() {
-    if (!(TICKS % SETTINGS["input_tick_rate"] == 0)) return true;
-    if (DEBUG["all_debug_logs"]) LOG(LogLevel::DEBUG, "Processing inputs!");
+    if (!(TICKS % SETTINGS["input_tick_rate"].get<int>() == 0)) return true;
+    if (DEBUG["all_debug_logs"].get<bool>()) LOG(LogLevel::Debug, "Processing inputs!");
 
     if (MODE == 1) {
-        if (SETTINGS["input_mode"] == 0) {
+        if (SETTINGS["input_mode"].get<int>() == 0) {
             return process_game_keyboard();
         }
     }

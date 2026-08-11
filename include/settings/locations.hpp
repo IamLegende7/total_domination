@@ -3,49 +3,60 @@
 
 #include "utils/config.hpp"
 
-#include <regex>
 #include <string>
 #include <SDL3/SDL.h>
+#include <filesystem>
 
 /* This is where most file locations are stored for later use in the main scripts
 
 */
 
-inline std::unordered_map<std::string, Setting> LOCATIONS;
+inline std::map<std::string, Setting> LOCATIONS;
 
-inline std::string replace_locations(std::string input_string) {
-    std::string output_string = input_string;
-    for (const auto& pair : LOCATIONS) {
-        output_string = std::regex_replace(output_string, std::regex("\\$" + pair.first + "\\$"), std::string(pair.second));    
+inline std::filesystem::path replace_locations(const std::filesystem::path& input_path) {
+    std::filesystem::path output_path = "";
+
+    for (const auto& piece : input_path) {
+        std::string piece_str = piece.string();
+        if (piece_str == "")
+            continue;
+        if ((piece_str.front() == '$') && (piece_str.back() == '$')) {
+            for (auto& [key, setting] : LOCATIONS) {
+                if ("$"+key+"$" == piece_str) {
+                    output_path /= setting.get<std::filesystem::path>();
+                    break;
+                }
+            }
+        } else {
+            output_path /= piece_str;
+        }
     }
 
-    return output_string;
+    return output_path;
 }
 
-inline void init_locations_settings(std::string config_file) {
-    std::string base_path = SDL_GetBasePath();
-    std::string cwd_path =  SDL_GetCurrentDirectory();
-    LOCATIONS["base"] =                 Setting(base_path.erase(base_path.find_last_not_of("/") + 1));
-    LOCATIONS["cwd"] =                  Setting(cwd_path.erase(cwd_path.find_last_not_of("/") + 1));
+inline void init_locations_settings(const std::filesystem::path& config_file) {
+    LOCATIONS["base"] =                 Setting(std::filesystem::path(SDL_GetBasePath()));
+    LOCATIONS["cwd"] =                  Setting(std::filesystem::path(SDL_GetCurrentDirectory()));
     // Main dirs //
-    LOCATIONS["data_dir"] =             Setting(replace_locations(load_setting<std::string>(config_file, "Main dirs", "data_dir")));
-    LOCATIONS["config_dir"] =           Setting(replace_locations(load_setting<std::string>(config_file, "Main dirs", "config_dir")));
-    LOCATIONS["resource_dir"] =         Setting(replace_locations(load_setting<std::string>(config_file, "Main dirs", "resource_dir")));
+    LOCATIONS["data_dir"] =             Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Main dirs", "data_dir")));
+    LOCATIONS["config_dir"] =           Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Main dirs", "config_dir")));
+    LOCATIONS["resource_dir"] =         Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Main dirs", "resource_dir")));
     // Maps //
-    LOCATIONS["map_dir"] =              Setting(replace_locations(load_setting<std::string>(config_file, "Maps", "map_dir")));
+    LOCATIONS["map_dir"] =              Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Maps", "map_dir")));
     // Textures //
-    LOCATIONS["texture_dir"] =          Setting(replace_locations(load_setting<std::string>(config_file, "Textures", "texture_dir")));
-    LOCATIONS["texturepack_dir"] =      Setting(replace_locations(load_setting<std::string>(config_file, "Textures", "texturepack_dir")));
-    LOCATIONS["missing_texture"] =      Setting(replace_locations(load_setting<std::string>(config_file, "Textures", "missing_texture")));
-    LOCATIONS["missing_texture"] =      Setting(replace_locations(load_setting<std::string>(config_file, "Textures", "missing_texture_tile")));
-    LOCATIONS["textures_json"] =        Setting(replace_locations(load_setting<std::string>(config_file, "Textures", "textures_json")));
+    LOCATIONS["texture_dir"] =          Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Textures", "texture_dir")));
+    LOCATIONS["texturepack_dir"] =      Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Textures", "texturepack_dir")));
+    LOCATIONS["missing_texture"] =      Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Textures", "missing_texture")));
+    LOCATIONS["missing_texture"] =      Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Textures", "missing_texture_tile")));
+    LOCATIONS["textures_json"] =        Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Textures", "textures_json")));
     // Logging //
-    LOCATIONS["log_dir"] =              Setting(replace_locations(load_setting<std::string>(config_file, "Logging", "log_dir")));
-    LOCATIONS["log_file"] =             Setting(replace_locations(load_setting<std::string>(config_file, "Logging", "log_file")));
-    LOCATIONS["log_crash_dir"] =        Setting(replace_locations(load_setting<std::string>(config_file, "Logging", "log_crash_dir")));
+    LOCATIONS["log_dir"] =              Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Logging", "log_dir")));
+    LOCATIONS["log_file"] =             Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Logging", "log_file")));
+    LOCATIONS["log_crash_dir"] =        Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Logging", "log_crash_dir")));
     // Registry //
-    LOCATIONS["units_json"] =           Setting(replace_locations(load_setting<std::string>(config_file, "Registry", "units_json")));
-    LOCATIONS["tiles_json"] =           Setting(replace_locations(load_setting<std::string>(config_file, "Registry", "tiles_json")));
+    LOCATIONS["units_json"] =           Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Registry", "units_json")));
+    LOCATIONS["tiles_json"] =           Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Registry", "tiles_json")));
 }
 
 #endif

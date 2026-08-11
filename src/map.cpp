@@ -6,6 +6,7 @@
 #include <SDL3/SDL_timer.h>
 #include "BS_thread_pool.hpp"
 #include <atomic>
+#include <filesystem>
 #include "rapidjson/document.h"
 
 #include "utils/json.hpp"
@@ -15,6 +16,10 @@
 #include "settings/debug.hpp"
 #include "utils/logger.hpp"
 
+// Windows is stupid
+#ifdef GetObject
+#undef GetObject
+#endif
 
 std::tuple<int, int, int, int> Map::get_surrounding(const int row, const int col) {
     return std::tuple<int, int, int, int> {
@@ -36,14 +41,15 @@ std::tuple<int, int, int, int> Map::get_surrounding(const int row, const int col
 MapTile* Map::get_tile(const int row, const int col, const bool suppress_logs) {
     if (!(row < (int)rows) || !(col < (int)cols)) {
         if (!suppress_logs)
-            LOG(LogLevel::WARNING, "Requested non-existent tile at %dx%d", col, row);
+            LOG(LogLevel::Warning, "Requested non-existent tile at %dx%d", col, row);
         return nullptr;
     }   
     return &map_data[row][col];
 }
 
-Map::Map(RenderAgent* agent, const std::string& map_path) {
-    LOG(LogLevel::INFO, "Loading map \"%s\"", replace_locations(map_path).c_str());
+Map::Map(RenderAgent* agent, const std::filesystem::path& map_path) {
+    const std::string map_path_str = replace_locations(map_path).u8string();
+    LOG(LogLevel::Info, "Loading map \"%s\"", map_path_str.c_str());
     Uint64 load_start_time = SDL_GetPerformanceCounter();
     Uint64 preformance_frequency = SDL_GetPerformanceFrequency();
 
@@ -52,11 +58,11 @@ Map::Map(RenderAgent* agent, const std::string& map_path) {
     this->map_path = map_path;
     const rapidjson::Document& map_json = open_json(replace_locations(map_path));
     if (!map_json.IsObject()) {
-        LOG(LogLevel::ERROR, "Could not load map %s: root is not an object.", map_path.c_str());
+        LOG(LogLevel::Error, "Could not load map %s: root is not an object.", map_path_str.c_str());
         return;
     }
     if (!map_json.HasMember("name")) {
-        LOG(LogLevel::ERROR, "Could not load map %s: json does not contain a \"name\" object.", map_path.c_str());
+        LOG(LogLevel::Error, "Could not load map %s: json does not contain a \"name\" object.", map_path_str.c_str());
         return;
     }
     map_name = std::string(map_json["name"].GetString());
@@ -66,11 +72,11 @@ Map::Map(RenderAgent* agent, const std::string& map_path) {
         map_description = "No discription given";
     }
     if (!map_json.HasMember("data")) {
-        LOG(LogLevel::ERROR, "Could not load map %s: json does not contain a \"data\" object.", map_name.c_str());
+        LOG(LogLevel::Error, "Could not load map %s: json does not contain a \"data\" object.", map_name.c_str());
         return;
     }
     if (map_json["data"].Size() == 0) {
-        LOG(LogLevel::ERROR, "Could not load map %s: \"data\" object can not be empty.", map_name.c_str());
+        LOG(LogLevel::Error, "Could not load map %s: \"data\" object can not be empty.", map_name.c_str());
         return;
     }
 
@@ -116,13 +122,13 @@ Map::Map(RenderAgent* agent, const std::string& map_path) {
 
     // Load //
     std::set<std::string> tile_textures;
-    if (SETTINGS["multithreading"]) {
+    if (SETTINGS["multithreading"].get<bool>()) {
         for (size_t r = 0; r < rows; ++r) {
             cols = std::max(cols, (size_t)map_json["data"][r].Size());
         }
         // cols is only informational for now; ok to keep.
 
-        const int configured_threads = (int)SETTINGS["num_threads"];
+        const int configured_threads = SETTINGS["num_threads"].get<int>();
         const size_t num_threads = (configured_threads == -1)
             ? std::max(1u, std::thread::hardware_concurrency())
             : (size_t)std::max(1, configured_threads);
@@ -208,10 +214,10 @@ Map::Map(RenderAgent* agent, const std::string& map_path) {
             std::string map_entity_name = "map:"+map_name+":tile:"+std::to_string(current_tile.x)+"x"+std::to_string(current_tile.y);
             for (int height_index = 0; height_index < current_tile.height; ++height_index) {
                 if ((height_index != current_tile.height-1) && (height_index <= surrounding_height)) {
-                    //LOG(LogLevel::DEBUG, "Skipping   : %dx%d height: %d", c, r, height_index);
+                    //LOG(LogLevel::Debug, "Skipping   : %dx%d height: %d", c, r, height_index);
                     continue;
                 } else if ((current_tile.top_tile != "td:none") && (height_index == current_tile.height-1)) {
-                    //LOG(LogLevel::DEBUG, "Adding Top : %dx%d height: %d", c, r, height_index);
+                    //LOG(LogLevel::Debug, "Adding Top : %dx%d height: %d", c, r, height_index);
                     agent->add_entity(
                         map_entity_name+":top_tile",
                         current_tile.top_tile,
@@ -220,7 +226,7 @@ Map::Map(RenderAgent* agent, const std::string& map_path) {
                         -1
                     );
                 } else {
-                    //LOG(LogLevel::DEBUG, "Adding base: %dx%d height: %d", c, r, height_index);
+                    //LOG(LogLevel::Debug, "Adding base: %dx%d height: %d", c, r, height_index);
                     agent->add_entity(
                         map_entity_name+":base",
                         current_tile.base,
@@ -244,9 +250,9 @@ Map::Map(RenderAgent* agent, const std::string& map_path) {
 
     Uint64 elapsed_ticks = SDL_GetPerformanceCounter() - load_start_time;
     double elapsed_ms = (elapsed_ticks / (double)preformance_frequency) * 1000.0;
-    LOG(LogLevel::INFO, "Loaded Map \"%s\" in %f ms", map_name.c_str(), elapsed_ms);
+    LOG(LogLevel::Info, "Loaded Map \"%s\" in %f ms", map_name.c_str(), elapsed_ms);
 
-    //for (size_t col_index = 0; col_index < cols; ++col_index) {LOG(LogLevel::DEBUG, "Tile %s at %dx%d", map_data[0][col_index].top_tile.c_str(), map_data[0][col_index].x, map_data[0][col_index].y);}
+    //for (size_t col_index = 0; col_index < cols; ++col_index) {LOG(LogLevel::Debug, "Tile %s at %dx%d", map_data[0][col_index].top_tile.c_str(), map_data[0][col_index].x, map_data[0][col_index].y);}
 }
 
 Map::~Map() {
@@ -264,11 +270,11 @@ bool Map::load_row(const rapidjson::GenericValue<rapidjson::UTF8<>>& row_json, c
 
         // Checking for errors //
         if ((!row_json[col_index].IsArray()) && (!row_json[col_index].IsObject())) {
-            LOG(LogLevel::ERROR, "Could not load row %d of map %s: tile %d;%d seems be neither an object nor an array", int(row_index), map_name.c_str(), int(col_index), int(row_index));
+            LOG(LogLevel::Error, "Could not load row %d of map %s: tile %d;%d seems be neither an object nor an array", int(row_index), map_name.c_str(), int(col_index), int(row_index));
             return false;
         }
         if (!(tile_json.HasMember("base"))) {
-            LOG(LogLevel::ERROR, "Could not load row %d of map %s: tile %d;%d seems to be missing a \"base\" object.", int(row_index), map_name.c_str(), int(col_index), int(row_index));
+            LOG(LogLevel::Error, "Could not load row %d of map %s: tile %d;%d seems to be missing a \"base\" object.", int(row_index), map_name.c_str(), int(col_index), int(row_index));
             return false;
         }
 
@@ -289,7 +295,7 @@ bool Map::load_row(const rapidjson::GenericValue<rapidjson::UTF8<>>& row_json, c
         /*
         std::string map_entity_name = "map:"+map_name+":tile:"+std::to_string(current_tile.x)+"x"+std::to_string(current_tile.y);
         for (int height_index = 0; height_index < current_tile.height; ++height_index) {
-            if (DEBUG["all_debug_logs"]) LOG(LogLevel::DEBUG, "Entity %s: height_index = %d; y = %d - 16*%d + 11*%d = %d", map_entity_name.c_str(), height_index, current_tile.y, height_index, current_tile.x, current_tile.y-(16*height_index)+(11*current_tile.x));
+            if (DEBUG["all_debug_logs"].get<bool>()) LOG(LogLevel::Debug, "Entity %s: height_index = %d; y = %d - 16*%d + 11*%d = %d", map_entity_name.c_str(), height_index, current_tile.y, height_index, current_tile.x, current_tile.y-(16*height_index)+(11*current_tile.x));
             if ((current_tile.top_tile != "td:none") && (height_index == current_tile.height-1)) {
                 agent->add_entity(map_entity_name+":top_tile", current_tile.top_tile, 16*(current_tile.x-current_tile.y), 11*(current_tile.y+current_tile.x)-(16*height_index), current_tile.size*4);
             } else {
@@ -300,18 +306,18 @@ bool Map::load_row(const rapidjson::GenericValue<rapidjson::UTF8<>>& row_json, c
         // Loading building // // TODO: load any actor
         if (row_json[col_index].IsArray() && (row_json[col_index].Size() > 1)) {
             if (row_json[col_index].Size() > 2) {
-                LOG(LogLevel::WARNING, "Tile %d;%d of map %s has more than 1 building! Only the first building will be loaded.", int(col_index), int(row_index), map_name.c_str());
+                LOG(LogLevel::Warning, "Tile %d;%d of map %s has more than 1 building! Only the first building will be loaded.", int(col_index), int(row_index), map_name.c_str());
             }
             if (!row_json[col_index][1].IsObject()) {
-                LOG(LogLevel::ERROR, "Could not load building on tile %d;%d of map %s: building has to be a json object.", int(col_index), int(row_index), map_name.c_str());
+                LOG(LogLevel::Error, "Could not load building on tile %d;%d of map %s: building has to be a json object.", int(col_index), int(row_index), map_name.c_str());
             } else {
                 if (!row_json[col_index][1].HasMember("type")) {
-                    LOG(LogLevel::ERROR, "Could not load building on tile %d;%d of map %s: no \"type\" object found.", int(col_index), int(row_index), map_name.c_str());
+                    LOG(LogLevel::Error, "Could not load building on tile %d;%d of map %s: no \"type\" object found.", int(col_index), int(row_index), map_name.c_str());
                 } else {
                     if (!(std::string(row_json[col_index][1]["type"].GetString()) == "td:Building")) {
-                        LOG(LogLevel::ERROR, "Could not load building on tile %d;%d of map %s: type is not of \"td:Building\" but is \"%s\".", int(col_index), int(row_index), map_name.c_str(), row_json[col_index][1]["type"].GetString());
+                        LOG(LogLevel::Error, "Could not load building on tile %d;%d of map %s: type is not of \"td:Building\" but is \"%s\".", int(col_index), int(row_index), map_name.c_str(), row_json[col_index][1]["type"].GetString());
                     } else {
-                        LOG(LogLevel::WARNING, "Building / Actor loading not implemented yet!");
+                        LOG(LogLevel::Warning, "Building / Actor loading not implemented yet!");
                     }
                 }
             }

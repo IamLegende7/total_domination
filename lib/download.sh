@@ -1,4 +1,5 @@
 #!/bin/sh
+# FIXME / TODO: remove
 
 set -e
 
