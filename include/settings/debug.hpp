@@ -20,6 +20,7 @@ inline void init_debug_settings(const std::filesystem::path& config_file) {
     // HUD //
     DEBUG["show_fps"] =                 Setting(load_setting<bool>(config_file.u8string(), "HUD", "show_fps", false));
     DEBUG["show_tps"] =                 Setting(load_setting<bool>(config_file.u8string(), "HUD", "show_tps", false));
+    DEBUG["show_afps"] =                Setting(load_setting<bool>(config_file.u8string(), "HUD", "show_afps", false));
     // Logging // 
     DEBUG["all_debug_logs"] =           Setting(load_setting<bool>(config_file.u8string(), "Logging", "all_debug_logs", false));
     // OverwritingUI //

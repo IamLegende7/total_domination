@@ -1,0 +1,8 @@
+[
+    {"texture": "td:card_parts:background_front", "x": 0, "y": 0, "a": 255},
+    {"texture": "$picture$", "x": 6, "y": 14, "a": 255},
+    {"texture": "td:card_parts:shine", "x": 0, "y": 0, "a": 85},
+    {"texture": "$actor$", "x": 0, "y": 0, "a": 255},
+    {"texture": "$frame$", "x": 0, "y": 0, "a": 255},
+    {"texture": "$seal$", "x": 57, "y": 2, "a": 255}
+]

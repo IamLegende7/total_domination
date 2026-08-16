@@ -34,6 +34,7 @@ class Map {
     private:
         RenderAgent* agent;
         MapTile** map_data;
+        void add_tile_enity(RenderAgent* agent, const std::string& name, const std::string& sprite_id, const int& x, const int& y, const int& height_index);
         bool load_row(const rapidjson::GenericValue<rapidjson::UTF8<>>& row_json, const size_t row, std::set<std::string>& tile_textures);
     public:
         std::string map_name;

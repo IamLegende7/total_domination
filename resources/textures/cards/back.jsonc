@@ -1,0 +1,4 @@
+[
+    {"texture": "td:card_parts:background_back", "x": 0, "y": 0, "a": 255},
+    {"texture": "td:card_parts:shine", "x": 0, "y": 0, "a": 85}
+]

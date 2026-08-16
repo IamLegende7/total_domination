@@ -19,8 +19,6 @@
 // for storing settings
 #include <map>
 
-// TODO: rewrite
-
 // Setting class //
 class Setting {
     public:
@@ -60,7 +58,7 @@ class Setting {
             try {
                 return std::get<std::string>(value).c_str();
             } catch (const std::bad_variant_access&) {
-                LOG(LogLevel::Error, "Type mismatch: Expected const \"char*\", returning default empty string.");
+                LOG(LogLevel::Error, "Type mismatch: Expected \"const char*\", returning default empty string.");
                 return "";
             }
         }

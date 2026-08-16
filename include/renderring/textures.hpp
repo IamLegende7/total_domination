@@ -8,6 +8,7 @@
 
 #include "renderring/render_agent.hpp"
 
+std::filesystem::path get_png_path(const std::string& name);
 std::filesystem::path get_texture_path(const std::string& name);
 
 bool add_texture(RenderAgent* agent, const std::string& texture_name);

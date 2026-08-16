@@ -1,7 +1,11 @@
 #include "map.hpp"
 
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_stdinc.h>
+
 #include <set>
+#include <string>
+#include <vector>
 #include <tuple>
 #include <SDL3/SDL_timer.h>
 #include "BS_thread_pool.hpp"
@@ -45,6 +49,31 @@ MapTile* Map::get_tile(const int row, const int col, const bool suppress_logs) {
         return nullptr;
     }   
     return &map_data[row][col];
+}
+
+void Map::add_tile_enity(RenderAgent* agent, const std::string& name, const std::string& sprite_id, const int& x, const int& y, const int& height_index) {
+    RenderAgentSprite* sprite = agent->get_sprite(sprite_id);
+    if (sprite != nullptr) {
+        std::vector<std::string> keys;
+        for (auto& [key, animation] : sprite->animations) {
+            if (key.rfind("alt", 0) == 0) {
+                keys.push_back(key);
+            }
+        }
+        std::string selected_animation = "default";
+        if (!keys.empty()) {
+            int random_index = SDL_rand(keys.size());
+            selected_animation = keys[random_index];
+        }
+        agent->add_entity(
+            name,
+            sprite_id,
+            selected_animation,
+            (16*(x-y)),
+            (11*(y+x)-(16*height_index)),
+            -1
+        );
+    }
 }
 
 Map::Map(RenderAgent* agent, const std::filesystem::path& map_path) {
@@ -96,8 +125,8 @@ Map::Map(RenderAgent* agent, const std::filesystem::path& map_path) {
                         agent->texture_exists(declaration.value[constructor_index]["texture"].GetString()) ?
                             "td:none" :
                             (declaration.value[constructor_index].HasMember("texture") ?
-                                get_texture_path(declaration.value[constructor_index]["texture"].GetString()) :
-                                get_texture_path("td:tile_missing")),
+                                get_png_path(declaration.value[constructor_index]["texture"].GetString()) :
+                                get_png_path("td:tile_missing")),
                         declaration.value[constructor_index].HasMember("x") ?
                             declaration.value[constructor_index]["x"].GetInt() :
                             0,
@@ -217,24 +246,34 @@ Map::Map(RenderAgent* agent, const std::filesystem::path& map_path) {
                     //LOG(LogLevel::Debug, "Skipping   : %dx%d height: %d", c, r, height_index);
                     continue;
                 } else if ((current_tile.top_tile != "td:none") && (height_index == current_tile.height-1)) {
-                    //LOG(LogLevel::Debug, "Adding Top : %dx%d height: %d", c, r, height_index);
-                    agent->add_entity(
+                    add_tile_enity(
+                        agent,
                         map_entity_name+":top_tile",
                         current_tile.top_tile,
-                        (16*(current_tile.x-current_tile.y)),
-                        (11*(current_tile.y+current_tile.x)-(16*height_index)),
-                        -1
+                        current_tile.x,
+                        current_tile.y,
+                        height_index
                     );
                 } else {
-                    //LOG(LogLevel::Debug, "Adding base: %dx%d height: %d", c, r, height_index);
-                    agent->add_entity(
+                    add_tile_enity(
+                        agent,
                         map_entity_name+":base",
                         current_tile.base,
-                        (16*(current_tile.x-current_tile.y)),
-                        (11*(current_tile.y+current_tile.x)-(16*height_index)),
-                        -1
+                        current_tile.x,
+                        current_tile.y,
+                        height_index
                     );
                 }
+            }
+            if ((current_tile.top_tile == "td:none") && (current_tile.top != "td:none")) {
+                add_tile_enity(
+                    agent,
+                    map_entity_name+":top",
+                    current_tile.top,
+                    current_tile.x,
+                    current_tile.y,
+                    current_tile.height-1
+                );
             }
         }
     }
@@ -297,9 +336,9 @@ bool Map::load_row(const rapidjson::GenericValue<rapidjson::UTF8<>>& row_json, c
         for (int height_index = 0; height_index < current_tile.height; ++height_index) {
             if (DEBUG["all_debug_logs"].get<bool>()) LOG(LogLevel::Debug, "Entity %s: height_index = %d; y = %d - 16*%d + 11*%d = %d", map_entity_name.c_str(), height_index, current_tile.y, height_index, current_tile.x, current_tile.y-(16*height_index)+(11*current_tile.x));
             if ((current_tile.top_tile != "td:none") && (height_index == current_tile.height-1)) {
-                agent->add_entity(map_entity_name+":top_tile", current_tile.top_tile, 16*(current_tile.x-current_tile.y), 11*(current_tile.y+current_tile.x)-(16*height_index), current_tile.size*4);
+                agent->add_entity(map_entity_name+":top_tile", current_tile.top_tile, "default", 16*(current_tile.x-current_tile.y), 11*(current_tile.y+current_tile.x)-(16*height_index), current_tile.size*4);
             } else {
-                agent->add_entity(map_entity_name+":base", current_tile.base, 16*(current_tile.x-current_tile.y), 11*(current_tile.y+current_tile.x)-(16*height_index), current_tile.size*4);
+                agent->add_entity(map_entity_name+":base", current_tile.base, "default", 16*(current_tile.x-current_tile.y), 11*(current_tile.y+current_tile.x)-(16*height_index), current_tile.size*4);
             }
         }
         
@@ -321,7 +360,7 @@ bool Map::load_row(const rapidjson::GenericValue<rapidjson::UTF8<>>& row_json, c
                     }
                 }
             }
-        x}
+        }
         */
     }
     return true;

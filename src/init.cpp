@@ -4,6 +4,7 @@
 #include <SDL3_image/SDL_image.h>
 #include <SDL3_ttf/SDL_ttf.h>
 #include <SDL3_shadercross/SDL_shadercross.h>
+#include <SDL3/SDL_stdinc.h>
 
 #include <string>
 #include <filesystem>
@@ -137,6 +138,9 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
 
     // TTF font loading //
     UI_RENDER_AGENT->add_font("def_font", SETTINGS["font"].get<std::filesystem::path>(), (float)(SETTINGS["font_size"].get<int>()/10));
+
+    // Seeding SDL_rand
+    SDL_srand(0);
 
     LOG(LogLevel::Info, "Setup all done!");
 

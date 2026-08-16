@@ -14,11 +14,19 @@
         "td:stone": "$texture_dir$/tiles/stone.png",
         // Tops //
         "td:top_missing": "$texture_dir$/tiles/tops/missing.png",
-        "td:top_grass": "$texture_dir$/tiles/tops/grass.png",
+        "td:top_grass": "$texture_dir$/tiles/tops/grass.jsonc",
         "td:top_grass_plane": "$texture_dir$/tiles/tops/grass_plane.png",
         "td:top_forest": "$texture_dir$/tiles/tops/forest.png",
         "td:top_dry_grass": "$texture_dir$/tiles/tops/dry_grass.png",
         "td:top_scorched_earth": "$texture_dir$/tiles/tops/scorched_earth.png",
-        "td:top_snow": "$texture_dir$/tiles/tops/snow.png"
+        "td:top_snow": "$texture_dir$/tiles/tops/snow.png",
+        // Card Parts //
+        "td:card_parts:background_front": "$texture_dir$/cards/background_front.png",
+        "td:card_parts:background_back": "$texture_dir$/cards/background_back.png",
+        "td:card_parts:shine": "$texture_dir$/cards/shine.png",
+        "td:card_parts:seal_neutral": "$texture_dir$/cards/seal/neutral.png",
+        "td:card_parts:seal_unit": "$texture_dir$/cards/seal/unit.png",
+        "td:card_parts:seal_military_building": "$texture_dir$/cards/seal/military_building.png",
+        "td:card_parts:seal_economy_building": "$texture_dir$/cards/seal/economy_building.png"
     }
 }

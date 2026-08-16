@@ -13,8 +13,10 @@ inline int CURRENT_RENDER_STATE = 0;
 
 // The how manyth tick in a second we are on right now
 inline Uint8 TICKS = 0;
+inline Uint8 CURRENT_ANIMATION_FRAME = 0;
 inline float ACTUAL_FRAME_RATE = 0;
 inline float ACTUAL_TICK_RATE = 0;
+inline int ACTUAL_ANIMATION_FRAME_RATE = 0;
 
 // 0: main menu; 1: in-game, payer turn; 2: enemy turn; 3: pause menu
 inline int MODE = 0;

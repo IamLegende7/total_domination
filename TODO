@@ -11,5 +11,5 @@ TODO: actors
 TODO: .lang files for translation
 TODO: own SDL_Scancode <-> string mapping (SDL3s is inconsistand across platforms)
 TODO: translate build.sh to CMake
-FIXME: CRT shader on windows just shows black window
+FIXME: CRT shader on windows just shows black window (now also on Linux for some reason)
 FIXME: Add forcing of the max level of a entity in the agent_entitys quadtree to fix movable entitys staying in the wrong QuadtreeNode

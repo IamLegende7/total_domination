@@ -11,7 +11,9 @@
 
 RenderAgent::RenderAgent(SDL_Renderer* renderer, bool allow_text) {
     this->renderer = renderer;
-    target = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, std::ceil(SCREEN_WIDTH/RENDER_SETTINGS["resolution"].get<int>()), std::ceil(SCREEN_HEIGHT/RENDER_SETTINGS["resolution"].get<int>()));
+    for (int i = 0; i < 12; ++i) {
+        target[i] = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, std::ceil(SCREEN_WIDTH/RENDER_SETTINGS["resolution"].get<int>()), std::ceil(SCREEN_HEIGHT/RENDER_SETTINGS["resolution"].get<int>()));
+    }
     if (allow_text) {
         if (RENDER_SETTINGS["render_mode"].get<int>() == 1) {
             text_engine = TTF_CreateRendererTextEngine(renderer);
@@ -35,8 +37,8 @@ std::tuple<int, int> RenderAgent::set_dimensions(const int cols, const int rows,
     int max_width = 0;
     int max_height = 0;
     for (const auto& pair : agent_sprites) {
-        max_width = std::max(max_width, pair.second.texture_rect.w);
-        max_height = std::max(max_height, pair.second.texture_rect.h);
+        max_width = std::max(max_width, pair.second.max.w);
+        max_height = std::max(max_height, pair.second.max.h);
     }
     map_width = (max_width+(16*(rows-1)))*2;
     map_height = (max_height+(11*(cols-1+rows-1)))*2;
@@ -96,15 +98,40 @@ bool RenderAgent::add_texture(const std::string& id, const std::filesystem::path
     return insert_texture(id, load_texture(texture_path));
 }
 
+bool RenderAgent::add_sprite(const std::string& id, const std::string& texture_id, const std::unordered_map<std::string, SpriteAnimation>& animations) {
+    if (get_sprite(id, true) != nullptr) {
+        LOG(LogLevel::Warning, "Could not add sprite \"%s\": already exists.", id.c_str());
+        return false;
+    }
+    agent_sprites[id] = RenderAgentSprite(texture_id, animations);
+    LOG(LogLevel::Debug, "Added new Sprite %s", id.c_str());
+    for (const auto& [key, animation] : animations) {
+        LOG(LogLevel::Debug, "   %s", key.c_str());
+        for (int i = 0; i < 12; ++i) {
+            const SDL_Rect& rect = animation.texture_rects[i];
+            LOG(LogLevel::Debug, "      Frame %d: %d, %d, %d, %d", i, rect.x, rect.y, rect.w, rect.h);
+        }
+    }
+    return true;
+}
+
+
 bool RenderAgent::add_sprite(const std::string& id, const std::string& texture_id, const int& x, const int& y, const int& width, const int& height) {
-    int sprite_x = x;
-    int sprite_y = y;
+    if (get_sprite(id, true) != nullptr) {
+        LOG(LogLevel::Warning, "Could not add sprite \"%s\": already exists.", id.c_str());
+        return false;
+    }
+    agent_sprites[id] = RenderAgentSprite(texture_id);
+
     int sprite_width = (width < 0) ? agent_textures[texture_id].width : width;
     int sprite_height = (height < 0) ? agent_textures[texture_id].height: height;
+    SpriteAnimation animation;
+    for (int i = 0; i < 12; ++i) {
+        animation.texture_rects[i] = {x, y, sprite_width, sprite_height};
+    }
+    agent_sprites[id].add_animation("default", animation);
 
-    SDL_Rect srcrect = {sprite_x, sprite_y, sprite_width, sprite_height};
-    agent_sprites[id] = RenderAgentSprite(texture_id, srcrect);
-    LOG(LogLevel::Debug, "Added new Sprite %s: srcrect: %d, %d, %d, %d", id.c_str(), agent_sprites[id].texture_rect.x, agent_sprites[id].texture_rect.y, agent_sprites[id].texture_rect.w, agent_sprites[id].texture_rect.h);
+    LOG(LogLevel::Debug, "Added new Sprite %s: srcrect: %d, %d, %d, %d", id.c_str(), x, y, sprite_width, sprite_height);
     return true;
 }
 
@@ -119,14 +146,14 @@ RenderAgentSprite* RenderAgent::get_sprite(const std::string& id, bool suppress_
     return nullptr;
 }
 
-bool RenderAgent::add_entity(const std::string& id, const std::string& sprite_id, const int& x, const int& y, const int& layer, const int& rotation, bool hidden) {
+bool RenderAgent::add_entity(const std::string& id, const std::string& sprite_id, const std::string& animation, const int& x, const int& y, const int& layer, const int& rotation, bool hidden) {
     const RenderAgentSprite* sprite = get_sprite(sprite_id);
     if (sprite == nullptr) {
         LOG(LogLevel::Warning, "Could not add entity \"%s\": sprite \"%s\" does not exist.", id.c_str(), sprite_id.c_str());
         return false;
     }
-    int width = sprite->texture_rect.w;
-    int height = sprite->texture_rect.h;
+    int width = sprite->max.w;
+    int height = sprite->max.h;
     int entity_layer;
     if (layer == -1) {
         heighest_layer = heighest_layer+1;
@@ -136,28 +163,23 @@ bool RenderAgent::add_entity(const std::string& id, const std::string& sprite_id
         entity_layer = layer;
     }
     //LOG(LogLevel::Debug, "Added new entity %s: X: %d, Y: %d, layer: %d, rotation: %d", id.c_str(), x, y, entity_layer, rotation);
-    return agent_entitys.insert(id, RenderAgentEntity(id, sprite_id, x, y, width, height, entity_layer, rotation, hidden));
+    return agent_entitys.insert(id, RenderAgentEntity(id, sprite_id, animation, x, y, width, height, entity_layer, rotation, hidden));
 };
 
-void RenderAgent::render_target() {
-    SDL_SetRenderTarget(renderer, NULL);
-    RenderState* current_state = &RENDER_STATES[CURRENT_RENDER_STATE];
-    SDL_SetGPURenderState(renderer, current_state->state);
-    SDL_RenderTexture(renderer, target, NULL, NULL);
-    SDL_SetGPURenderState(renderer, NULL);
-}
-
 bool RenderAgent::render(const int zoom, const int x_offset, const int y_offset, const bool clear_renderer, const int resolution, SDL_Color clear_colour) {
-    if (!dirty)
+    if (!dirty[CURRENT_ANIMATION_FRAME])
         return false;
 
-    //LOG(LogLevel::Debug, "Starting Renderpass");
     if (RENDER_SETTINGS["render_mode"].get<int>() == 1) {
         // Set target //
-        if ((target->w != SCREEN_WIDTH) || (target->h != SCREEN_HEIGHT)) {
-            target = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, std::ceil(SCREEN_WIDTH/RENDER_SETTINGS["resolution"].get<int>()), std::ceil(SCREEN_HEIGHT/RENDER_SETTINGS["resolution"].get<int>()));
+        if (
+            !target[CURRENT_ANIMATION_FRAME]
+            || (target[CURRENT_ANIMATION_FRAME]->w != std::ceil(SCREEN_WIDTH/RENDER_SETTINGS["resolution"].get<int>()))
+            || (target[CURRENT_ANIMATION_FRAME]->h != std::ceil(SCREEN_HEIGHT/RENDER_SETTINGS["resolution"].get<int>()))
+        ) {
+            target[CURRENT_ANIMATION_FRAME] = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, std::ceil(SCREEN_WIDTH/RENDER_SETTINGS["resolution"].get<int>()), std::ceil(SCREEN_HEIGHT/RENDER_SETTINGS["resolution"].get<int>()));
         }
-        SDL_SetRenderTarget(renderer, target);
+        SDL_SetRenderTarget(renderer, target[CURRENT_ANIMATION_FRAME]);
 
         // Clear //
         if (clear_renderer) {
@@ -210,10 +232,10 @@ bool RenderAgent::render(const int zoom, const int x_offset, const int y_offset,
             SDL_FRect dst_frect = {
                 (float)real_x,
                 (float)real_y,
-                (float)sprite->texture_rect.w*zoom * inverse_resolution,
-                (float)sprite->texture_rect.h*zoom * inverse_resolution
+                (float)sprite->max.w*zoom * inverse_resolution,
+                (float)sprite->max.h*zoom * inverse_resolution
             };
-            SDL_RectToFRect(&sprite->texture_rect, &src_frect);
+            SDL_RectToFRect(&sprite->animations[entity->animation].texture_rects[CURRENT_ANIMATION_FRAME], &src_frect);
             SDL_RenderTexture(renderer, tex_cache, &src_frect, &dst_frect);
         }
 
@@ -228,8 +250,21 @@ bool RenderAgent::render(const int zoom, const int x_offset, const int y_offset,
         }
         entitys_on_screen.clear();
     }
-    dirty = false;
+    dirty[CURRENT_ANIMATION_FRAME] = false;
     return true;
+}
+
+void RenderAgent::render_target() {
+    //LOG(LogLevel::Debug, "Starting Renderpass");
+    SDL_SetRenderTarget(renderer, NULL);
+    RenderState* current_state = &RENDER_STATES[CURRENT_RENDER_STATE];
+    SDL_SetGPURenderState(renderer, current_state->state);
+    SDL_RenderTexture(renderer, target[CURRENT_ANIMATION_FRAME], NULL, NULL);
+    SDL_SetGPURenderState(renderer, NULL);
+}
+
+void RenderAgent::set_dirty(bool value) {
+    for (bool &frame : dirty) frame = value;
 }
 
 RenderAgentTexture RenderAgent::bake_texture(TextureConstructor* texture_constructors[], const int array_size, const bool force_file_loading) {

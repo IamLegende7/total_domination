@@ -28,16 +28,21 @@ SDL_AppResult SDL_AppIterate(void* appState) {
     static Uint32 last_time = SDL_GetTicks();
     static int ms_per_tick = 1000 / SETTINGS["tick_rate"].get<int>();
     static int ms_per_frame = 1000 / SETTINGS["max_frame_rate"].get<int>();
+    static int ms_per_animation_frame = 1000 / SETTINGS["animation_frame_rate"].get<int>();
     static int accumulator_tick = 0;
+    static int accumulator_animation_frame = 0;
     static int tick_count = 0; // Counting ticks/frames each second for FPS/tick rate calulations
     static int frame_count = 0;
+    static int animation_frame_count = 0;
     static int elapsed_time_tick_rate = 0;
     static int elapsed_time_frame_rate = 0;
+    static int elapsed_animation_frame_rate = 0;
 
     Uint32 current_time = SDL_GetTicks();
     int delta_time = current_time - last_time;
     last_time = current_time;
     accumulator_tick += delta_time;
+    accumulator_animation_frame += delta_time;
 
 
     // Calulating FPS & tick rate
@@ -54,7 +59,7 @@ SDL_AppResult SDL_AppIterate(void* appState) {
                 Text* tps_text = UI_RENDER_AGENT->get_text("TPS");
                 if (tps_text != nullptr)
                     TTF_SetTextString(tps_text->text, ("TPS: "+std::to_string((int)(std::round(ACTUAL_TICK_RATE-0.5)))).c_str(), 0);
-                UI_RENDER_AGENT->dirty = true;
+                UI_RENDER_AGENT->set_dirty();
             }
         }
         tick_count = 0;
@@ -71,11 +76,28 @@ SDL_AppResult SDL_AppIterate(void* appState) {
                 Text* fps_text = UI_RENDER_AGENT->get_text("FPS");
                 if (fps_text != nullptr)
                     TTF_SetTextString(fps_text->text, ("FPS: "+std::to_string((int)(std::round(ACTUAL_FRAME_RATE-0.5)))).c_str(), 0);
-                UI_RENDER_AGENT->dirty = true;
+                UI_RENDER_AGENT->set_dirty();
             }
         }
         frame_count = 0;
         elapsed_time_frame_rate = 0;
+    }
+
+    if (elapsed_animation_frame_rate >= 1000) {
+        int last_animation_frame_rate = ACTUAL_FRAME_RATE;
+        ACTUAL_ANIMATION_FRAME_RATE = (int)(std::round((animation_frame_count*1000.0f / elapsed_animation_frame_rate)-0.5));
+        //LOG(LogLevel::Debug, "AFPS is %d: %d*1000 / %d",
+        //    ACTUAL_ANIMATION_FRAME_RATE, animation_frame_count, elapsed_animation_frame_rate);
+        if (DEBUG["show_afps"].get<bool>()) {
+            if (last_animation_frame_rate != ACTUAL_ANIMATION_FRAME_RATE) {
+                Text* afps_text = UI_RENDER_AGENT->get_text("AFPS");
+                if (afps_text != nullptr)
+                    TTF_SetTextString(afps_text->text, ("FPS: "+std::to_string(ACTUAL_ANIMATION_FRAME_RATE)).c_str(), 0);
+                UI_RENDER_AGENT->set_dirty();
+            }
+        }
+        animation_frame_count = 0;
+        elapsed_animation_frame_rate = 0;
     }
 
 
@@ -117,20 +139,20 @@ SDL_AppResult SDL_AppIterate(void* appState) {
                     const auto [surrounding_height_top, surrounding_height_bottom, surrounding_height_left, surrounding_height_right] = MAIN_MAP->get_surrounding(TILE_SELECTION_Y, TILE_SELECTION_X);
                     const bool hide_left = (selected_tile->height <= surrounding_height_bottom);
                     const bool hide_right = (selected_tile->height <= surrounding_height_right);
-                    if (!MAIN_RENDER_AGENT->add_entity("selected_tile_top", "td:selected_tile_top", selected_tile_x, selected_tile_y, -1, 0, false))
+                    if (!MAIN_RENDER_AGENT->add_entity("selected_tile_top", "td:selected_tile_top", "default", selected_tile_x, selected_tile_y, -1, 0, false))
                         LOG(LogLevel::Error, "Could not add tile \"selected_tile_top\"");
-                    if (!MAIN_RENDER_AGENT->add_entity("selected_tile_left", "td:selected_tile_left", selected_tile_x, selected_tile_y, -1, 0, hide_left))
+                    if (!MAIN_RENDER_AGENT->add_entity("selected_tile_left", "td:selected_tile_left", "default", selected_tile_x, selected_tile_y, -1, 0, hide_left))
                         LOG(LogLevel::Error, "Could not add tile \"selected_tile_left\"");
-                    if (!MAIN_RENDER_AGENT->add_entity("selected_tile_right", "td:selected_tile_right", selected_tile_x, selected_tile_y, -1, 0, hide_right))
+                    if (!MAIN_RENDER_AGENT->add_entity("selected_tile_right", "td:selected_tile_right", "default", selected_tile_x, selected_tile_y, -1, 0, hide_right))
                         LOG(LogLevel::Error, "Could not add tile \"selected_tile_right\"");
                     RenderAgentEntity* selected_tile_top = MAIN_RENDER_AGENT->get_entity("selected_tile_top");
                     if (selected_tile_top != nullptr) {
-                        SDL_Rect& selected_tile_top_rect = MAIN_RENDER_AGENT->get_sprite(selected_tile_top->sprite)->texture_rect;
+                        SDL_Rect& selected_tile_top_rect = MAIN_RENDER_AGENT->get_sprite(selected_tile_top->sprite)->max;
                         CAMERA.x = (selected_tile_top->x+(int)(selected_tile_top_rect.w/2))-(int)((SCREEN_WIDTH/2)/CAMERA.zoom);
                         CAMERA.y = (selected_tile_top->y+(int)(selected_tile_top_rect.h/2))-(int)((SCREEN_HEIGHT/2)/CAMERA.zoom);
                     }
-                    MAIN_RENDER_AGENT->dirty = true;
-                    UI_RENDER_AGENT->dirty = true;
+                    MAIN_RENDER_AGENT->set_dirty();
+                    UI_RENDER_AGENT->set_dirty();
                 }
                 MODE = 1;
             }
@@ -143,15 +165,21 @@ SDL_AppResult SDL_AppIterate(void* appState) {
         if (TICKS >= 20) TICKS = 0;
     }
 
+    bool new_animation_frame = false;
+    while (accumulator_animation_frame >= ms_per_animation_frame) {
+        CURRENT_ANIMATION_FRAME = (CURRENT_ANIMATION_FRAME+1)%12;
+        if (DEBUG["all_debug_logs"].get<bool>()) LOG(LogLevel::Debug, "Current animation frame = %d", CURRENT_ANIMATION_FRAME);
+        new_animation_frame = true;
+        accumulator_animation_frame -= ms_per_animation_frame;
+    }
+
     // Renderring
     if (MODE == 0) {
-
+        // TODO
     } else if (MODE == 1) {
-        bool changed_main;
-        bool changed_ui;
-        changed_main = MAIN_RENDER_AGENT->render(CAMERA.zoom, CAMERA.x, CAMERA.y, true, RENDER_SETTINGS["resolution"].get<int>());
-        changed_ui = UI_RENDER_AGENT->render(UI_ZOOM, 0, 0, true, RENDER_SETTINGS["resolution"].get<int>(), {0, 0, 0, 0}); // TODO: Only overwrite the area of target tex of the old text if the text changes, not the whole target tex
-        if (changed_main || changed_ui) {
+        bool changed_main = MAIN_RENDER_AGENT->render(CAMERA.zoom, CAMERA.x, CAMERA.y, true, RENDER_SETTINGS["resolution"].get<int>());
+        bool changed_ui = UI_RENDER_AGENT->render(UI_ZOOM, 0, 0, true, RENDER_SETTINGS["resolution"].get<int>(), {0, 0, 0, 0}); // TODO: Only overwrite the area of target tex of the old text if the text changes, not the whole target tex
+        if (changed_main || changed_ui || new_animation_frame) {
             MAIN_RENDER_AGENT->render_target();
             UI_RENDER_AGENT->render_target();
         }
@@ -189,8 +217,8 @@ SDL_AppResult SDL_AppEvent(void* appState, SDL_Event* event) {
                 CURRENT_RENDER_STATE = 0;
             }
         }
-        MAIN_RENDER_AGENT->dirty = true;
-        UI_RENDER_AGENT->dirty = true;
+        MAIN_RENDER_AGENT->set_dirty();
+        UI_RENDER_AGENT->set_dirty();
     }
     INPUTS->update(event);
 

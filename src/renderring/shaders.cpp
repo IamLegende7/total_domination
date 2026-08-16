@@ -140,7 +140,7 @@ SDL_GPUShader* load_shader(SDL_GPUDevice *device, const std::filesystem::path& f
 
 bool add_renderer_render_state(SDL_Renderer* renderer, const std::filesystem::path& filename,  std::vector<RenderState>& render_states) {
     SDL_GPUDevice* device = SDL_GetGPURendererDevice(renderer);
-    if (!device) { // TODO: Better logging
+    if (!device) {
         LOG(LogLevel::Error, "Couldn't get GPU device: %s", SDL_GetError());
         return false;
     }

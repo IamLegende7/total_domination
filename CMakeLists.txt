@@ -21,7 +21,7 @@ set(LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin/lib)
 
 ### Compile options ###
 # Set compile options
-target_compile_options(Total_Domination PRIVATE -Wall -Wextra)
+target_compile_options(Total_Domination PRIVATE -Wall -Wextra -g -O0)
 
 target_include_directories(Total_Domination PRIVATE 
     include 
@@ -31,7 +31,6 @@ target_include_directories(Total_Domination PRIVATE
 )
 
 
-### Settings ###
 ### Settings ###
 
 set(SDLTTF_VENDORED ON)
