@@ -1,21 +1,27 @@
 #ifndef QUADTREE_HPP
 #define QUADTREE_HPP
 
+#include <deque>
 #include <vector>
+#include <unordered_map>
 #include <string>
 #include <SDL3/SDL.h>
 #include <cmath>
-#include <algorithm>
 
 #include "utils/logger.hpp"
 
+template<typename T>
+struct QuadtreeEntry {
+    T* content = nullptr;
+    int max_depth = -1;
+};
 
 // !! "T" needs to have x, y, width and height attributes !!
 template<typename T>
 class QuadtreeNode {
     private:
-        std::vector<T> contents;
-        std::vector<std::string> ids;
+        std::unordered_map<std::string, QuadtreeEntry<T>> contents;
+        std::deque<T> contents_storage;
         QuadtreeNode* children[4] = {nullptr, nullptr, nullptr, nullptr};
 
         bool subdivide() {
@@ -37,15 +43,12 @@ class QuadtreeNode {
             children[2] = new QuadtreeNode(x,     mid_y, child_width, height - child_height, node_capacity, depth+1);
             children[3] = new QuadtreeNode(mid_x, mid_y, width - child_width, height - child_height, node_capacity, depth+1);
 
-            std::vector<T> old_contents = contents;
-            std::vector<std::string> old_ids = ids;
+            std::unordered_map<std::string, QuadtreeEntry<T>> old_contents = contents;
             contents.clear();
-            ids.clear();
-            for (size_t i = 0; i < old_contents.size(); ++i) {
-                insert(old_ids[i], old_contents[i]);
+            for (const auto& [id, current_entry] : old_contents) {
+                insert_pointer(id, current_entry.content, current_entry.max_depth);
             }
             old_contents.clear();
-            old_ids.clear();
 
             return true;
         };
@@ -57,10 +60,7 @@ class QuadtreeNode {
         int depth = 0;
 
         QuadtreeNode(): x(0), y(0), width(0), height(0), node_capacity(0), depth(0) {};
-        QuadtreeNode(const int x, const int y, const int width, const int height, const int node_capacity, const int depth=0): x(x), y(y), width(width), height(height), node_capacity(node_capacity), depth(depth) {
-            contents.reserve(node_capacity);
-            ids.reserve(node_capacity);
-        };
+        QuadtreeNode(const int x, const int y, const int width, const int height, const int node_capacity, const int depth=0): x(x), y(y), width(width), height(height), node_capacity(node_capacity), depth(depth) {};
         ~QuadtreeNode() {};
         void set_dimensions(int x, int y, int width, int height) {
             this->x = x;
@@ -70,53 +70,104 @@ class QuadtreeNode {
         }
         void set_capacity(const int node_capacity) {
             this->node_capacity = node_capacity;
-            contents.reserve(node_capacity);
-            ids.reserve(node_capacity);
         };
 
-        bool insert(const std::string& id, T entry) {
+        bool insert(const std::string& id, T entry, const int& max_depth=-1, const bool allow_subdivision=true) {
             if (depth == 0) {
                 if (!(
-                    x <= entry.x+entry.width &&
-                    x+width >= entry.x &&
-                    y <= entry.y+entry.height &&
-                    y+height >= entry.y
+                    entry.x <= x+width &&
+                    entry.y <= y+height &&
+                    entry.x+entry.width >= x &&
+                    entry.y+entry.height >= y
                 ))
                     return false;
             } else if (!(
-                x >= entry.x &&
-                x+width <= entry.x+entry.width &&
-                y >= entry.y &&
-                y+height <= entry.y+entry.height
+                entry.x >= x &&
+                entry.y >= y &&
+                entry.x+entry.width <= x+width &&
+                entry.y+entry.height <= y+height
             )) {
                 return false;
             }
 
             if (children[0] == nullptr) {
-                contents.push_back(entry);
-                ids.push_back(id);
+                contents_storage.push_back(entry);
+                contents[id] = {&contents_storage.back(), max_depth};
 
-                if ((int)contents.size() > node_capacity)
+                if (allow_subdivision && ((int)contents.size() > node_capacity))
                     subdivide();
+                return true;
+            } else if ((max_depth != -1) && (max_depth <= depth)) {
+                contents_storage.push_back(entry);
+                contents[id] = {&contents_storage.back(), max_depth};
                 return true;
             } else {
                 bool taken = false;
                 for (int i = 0; i < 4; ++i) {
-                    if (children[i]->insert(id, entry)) {
+                    if (children[i]->insert(id, entry, max_depth)) {
                         taken = true;
-                        if (std::find(ids.begin(), ids.end(), id) == ids.end())
-                            ids.push_back(id);
+                        contents[id] = {nullptr, depth};
                         break;
                     }
                 }
 
                 if (!taken) {
-                    contents.push_back(entry);
-                    ids.push_back(id);
+                    contents_storage.push_back(entry);
+                    contents[id] = {&contents_storage.back(), max_depth};
                 }
                 return true;
             }
             return false;
+        };
+
+        bool insert_pointer(const std::string& id, T* entry, const int& max_depth=-1, const bool allow_subdivision=true) {
+            if (depth == 0) {
+                if (!(
+                    entry->x <= x+width &&
+                    entry->y <= y+height &&
+                    entry->x+entry->width >= x &&
+                    entry->y+entry->height >= y
+                ))
+                    return false;
+            } else if (!(
+                entry->x >= x &&
+                entry->y >= y &&
+                entry->x+entry->width <= x+width &&
+                entry->y+entry->height <= y+height
+            )) {
+                return false;
+            }
+
+            if (children[0] == nullptr) {
+                contents[id] = {entry, max_depth};
+
+                if (allow_subdivision && ((int)contents.size() > node_capacity))
+                    subdivide();
+                return true;
+            } else if ((max_depth != -1) && (max_depth <= depth)) {
+                contents[id] = {entry, max_depth};
+                return true;
+            } else {
+                bool taken = false;
+                for (int i = 0; i < 4; ++i) {
+                    if (children[i]->insert_pointer(id, entry, max_depth)) {
+                        taken = true;
+                        contents[id] = {nullptr, depth};
+                        break;
+                    }
+                }
+
+                if (!taken)
+                    contents[id] = {entry, max_depth};
+                return true;
+            }
+            return false;
+        };
+
+        bool trigger_subdivision() {
+            if ((children[0] == nullptr) && ((int)contents.size() > node_capacity))
+                subdivide();
+            return true;
         };
 
         bool query(const int target_x, const int target_y, const int target_width, const int target_height, std::vector<T*>& result) {
@@ -128,14 +179,16 @@ class QuadtreeNode {
             ))
                 return false;
 
-            for (auto& entry : contents) {
+            for (const auto& [id, current_entry] : contents) {
+                if (current_entry.content == nullptr)
+                    continue;
                 if (
-                    entry.x <= target_x+target_width &&
-                    entry.x+entry.width >= target_x &&
-                    entry.y <= target_y+target_height &&
-                    entry.y+entry.height >= target_y
+                    current_entry.content->x <= target_x+target_width &&
+                    current_entry.content->x+current_entry.content->width >= target_x &&
+                    current_entry.content->y <= target_y+target_height &&
+                    current_entry.content->y+current_entry.content->height >= target_y
                 )
-                    result.push_back(&entry);
+                    result.push_back(current_entry.content);
             }
             if (children[0] != nullptr) {
                 for (int i = 0; i < 4; ++i) {
@@ -146,12 +199,20 @@ class QuadtreeNode {
         };
 
         bool query_by_id(const std::string& id, std::vector<T*>& result) {
-            if (std::find(ids.begin(), ids.end(), id) == ids.end())
+            bool is_present = false;
+            for (const auto& [current_id, current_entry] : contents) {
+                if (current_id == id) {
+                    is_present = true;
+                    break;
+                }
+            }
+            if (!is_present)
                 return false;
 
-            for (size_t i = 0; i < contents.size(); ++i) {
-                if (ids[i] == id)
-                    result.push_back(&contents[i]);
+            for (const auto& [current_id, current_entry] : contents) {
+                if ((current_id == id) && (current_entry.content != nullptr)) {
+                    result.push_back(current_entry.content);
+                }
             }
             if (children[0] != nullptr) {
                 for (int i = 0; i < 4; ++i) {
@@ -161,19 +222,19 @@ class QuadtreeNode {
             return true;
         };
 
-        bool render(SDL_Renderer* renderer, const int x_offset, const int y_offset, const int zoom, const SDL_Color& colour={200, 30, 210, 255}) { // TODO: don't render outside of view
+        bool render(SDL_Renderer* renderer, const int x_offset, const int y_offset, const int zoom, const int resolution, const SDL_Color& colour={200, 30, 210, 255}) { // TODO: don't render outside of view
             SDL_FRect rect = {
-                (float)(x - x_offset) * zoom,
-                (float)(y - y_offset) * zoom,
-                (float)width * zoom,
-                (float)height * zoom
+                (float)std::ceil(((x - x_offset) * zoom) / resolution),
+                (float)std::ceil(((y - y_offset) * zoom) / resolution),
+                (float)std::ceil(width * zoom),
+                (float)std::ceil(height * zoom)
             };
             SDL_SetRenderDrawColor(renderer, colour.r, colour.g, colour.b, colour.a);
             SDL_RenderRect(renderer, &rect);
 
             if (children[0] != nullptr) {
                 for (int i = 0; i < 4; ++i) {
-                    children[i]->render(renderer, x_offset, y_offset, zoom, colour);
+                    children[i]->render(renderer, x_offset, y_offset, zoom, resolution, colour);
                 }
             }
             return true;

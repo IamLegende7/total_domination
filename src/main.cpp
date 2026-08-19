@@ -139,11 +139,11 @@ SDL_AppResult SDL_AppIterate(void* appState) {
                     const auto [surrounding_height_top, surrounding_height_bottom, surrounding_height_left, surrounding_height_right] = MAIN_MAP->get_surrounding(TILE_SELECTION_Y, TILE_SELECTION_X);
                     const bool hide_left = (selected_tile->height <= surrounding_height_bottom);
                     const bool hide_right = (selected_tile->height <= surrounding_height_right);
-                    if (!MAIN_RENDER_AGENT->add_entity("selected_tile_top", "td:selected_tile_top", "default", selected_tile_x, selected_tile_y, -1, 0, false))
+                    if (!MAIN_RENDER_AGENT->add_entity("selected_tile_top", "td:selected_tile_top", "default", selected_tile_x, selected_tile_y, -1, 0, false, true))
                         LOG(LogLevel::Error, "Could not add tile \"selected_tile_top\"");
-                    if (!MAIN_RENDER_AGENT->add_entity("selected_tile_left", "td:selected_tile_left", "default", selected_tile_x, selected_tile_y, -1, 0, hide_left))
+                    if (!MAIN_RENDER_AGENT->add_entity("selected_tile_left", "td:selected_tile_left", "default", selected_tile_x, selected_tile_y, -1, 0, hide_left, true))
                         LOG(LogLevel::Error, "Could not add tile \"selected_tile_left\"");
-                    if (!MAIN_RENDER_AGENT->add_entity("selected_tile_right", "td:selected_tile_right", "default", selected_tile_x, selected_tile_y, -1, 0, hide_right))
+                    if (!MAIN_RENDER_AGENT->add_entity("selected_tile_right", "td:selected_tile_right", "default", selected_tile_x, selected_tile_y, -1, 0, hide_right, true))
                         LOG(LogLevel::Error, "Could not add tile \"selected_tile_right\"");
                     RenderAgentEntity* selected_tile_top = MAIN_RENDER_AGENT->get_entity("selected_tile_top");
                     if (selected_tile_top != nullptr) {

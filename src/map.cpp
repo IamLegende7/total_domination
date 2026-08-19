@@ -51,31 +51,6 @@ MapTile* Map::get_tile(const int row, const int col, const bool suppress_logs) {
     return &map_data[row][col];
 }
 
-void Map::add_tile_enity(RenderAgent* agent, const std::string& name, const std::string& sprite_id, const int& x, const int& y, const int& height_index) {
-    RenderAgentSprite* sprite = agent->get_sprite(sprite_id);
-    if (sprite != nullptr) {
-        std::vector<std::string> keys;
-        for (auto& [key, animation] : sprite->animations) {
-            if (key.rfind("alt", 0) == 0) {
-                keys.push_back(key);
-            }
-        }
-        std::string selected_animation = "default";
-        if (!keys.empty()) {
-            int random_index = SDL_rand(keys.size());
-            selected_animation = keys[random_index];
-        }
-        agent->add_entity(
-            name,
-            sprite_id,
-            selected_animation,
-            (16*(x-y)),
-            (11*(y+x)-(16*height_index)),
-            -1
-        );
-    }
-}
-
 Map::Map(RenderAgent* agent, const std::filesystem::path& map_path) {
     const std::string map_path_str = replace_locations(map_path).u8string();
     LOG(LogLevel::Info, "Loading map \"%s\"", map_path_str.c_str());
@@ -148,6 +123,7 @@ Map::Map(RenderAgent* agent, const std::filesystem::path& map_path) {
     rows = map_json["data"].Size();
     cols = 0;
     map_data = new MapTile*[rows];
+    entity_cache = new std::vector<RenderAgentEntity>*[rows];
 
     // Load //
     std::set<std::string> tile_textures;
@@ -155,7 +131,6 @@ Map::Map(RenderAgent* agent, const std::filesystem::path& map_path) {
         for (size_t r = 0; r < rows; ++r) {
             cols = std::max(cols, (size_t)map_json["data"][r].Size());
         }
-        // cols is only informational for now; ok to keep.
 
         const int configured_threads = SETTINGS["num_threads"].get<int>();
         const size_t num_threads = (configured_threads == -1)
@@ -167,7 +142,7 @@ Map::Map(RenderAgent* agent, const std::filesystem::path& map_path) {
         std::vector<std::set<std::string>> thread_texture_sets(num_threads);
         std::atomic<bool> ok{true};
 
-        // IMPORTANT: store futures so we don't ignore nodiscard
+        // IMPORTANT: store futures
         std::vector<std::future<void>> futures;
         futures.reserve(rows);
 
@@ -187,7 +162,6 @@ Map::Map(RenderAgent* agent, const std::filesystem::path& map_path) {
             );
         }
 
-        // Wait + propagate exceptions
         for (auto& f : futures) f.get();
 
         if (!ok.load()) {
@@ -213,6 +187,7 @@ Map::Map(RenderAgent* agent, const std::filesystem::path& map_path) {
     }
 
     // Baking Atlas //
+    tile_textures.insert("td:tile_missing");
     std::string tile_texture_names[tile_textures.size()];
     int tile_texture_index = 0;
     for (auto texture = tile_textures.begin(); texture != tile_textures.end(); ++texture) {
@@ -224,61 +199,91 @@ Map::Map(RenderAgent* agent, const std::filesystem::path& map_path) {
     agent->set_dimensions(cols, rows, -(16*(rows-1)), 0); // FIXME: tiles with a large height can be above y=0
 
     // Add entitys //
-    for (size_t r = 0; r < rows; ++r) {
-        const auto row_size = map_json["data"][r].Size();
-        for (size_t c = 0; c < row_size; ++c) {
-            MapTile& current_tile = map_data[r][c];
-            const auto [surrounding_height_top, surrounding_height_bottom, surrounding_height_left, surrounding_height_right] = get_surrounding(r, c);
-            int surrounding_height = std::min(
-                std::min(
-                    surrounding_height_top,
-                    surrounding_height_bottom
-                ),
-                std::min(
-                    surrounding_height_left,
-                    surrounding_height_right
-                )
-            );
+    if (SETTINGS["multithreading"].get<bool>()) {
+        const int configured_threads = SETTINGS["num_threads"].get<int>();
+        const size_t num_threads = (configured_threads == -1)
+            ? std::max(1u, std::thread::hardware_concurrency())
+            : (size_t)std::max(1, configured_threads);
 
-            std::string map_entity_name = "map:"+map_name+":tile:"+std::to_string(current_tile.x)+"x"+std::to_string(current_tile.y);
-            for (int height_index = 0; height_index < current_tile.height; ++height_index) {
-                if ((height_index != current_tile.height-1) && (height_index <= surrounding_height)) {
-                    //LOG(LogLevel::Debug, "Skipping   : %dx%d height: %d", c, r, height_index);
-                    continue;
-                } else if ((current_tile.top_tile != "td:none") && (height_index == current_tile.height-1)) {
-                    add_tile_enity(
-                        agent,
-                        map_entity_name+":top_tile",
-                        current_tile.top_tile,
-                        current_tile.x,
-                        current_tile.y,
-                        height_index
-                    );
-                } else {
-                    add_tile_enity(
-                        agent,
-                        map_entity_name+":base",
-                        current_tile.base,
-                        current_tile.x,
-                        current_tile.y,
-                        height_index
-                    );
-                }
+        BS::thread_pool pool(num_threads);
+
+        std::atomic<bool> ok{true};
+
+        // IMPORTANT: store futures
+        std::vector<std::future<void>> futures;
+        futures.reserve(rows);
+
+        for (size_t r = 0; r < rows; ++r) {
+            futures.emplace_back(
+                pool.submit_task([this, &map_json, r, &ok, num_threads]() {
+                    if (!ok.load(std::memory_order_relaxed)) return;
+
+                    const auto& row_val = this->map_data[r];
+                    entity_cache[r] = new std::vector<RenderAgentEntity>[map_json["data"][r].Size()];
+
+                    bool row_ok = this->make_row_entitys(row_val, map_json["data"][r].Size(), r);
+                    if (!row_ok) ok.store(false, std::memory_order_relaxed);
+                })
+            );
+        }
+
+        for (auto& f : futures) f.get();
+
+        if (!ok.load()) {
+            for (size_t r = 0; r < rows; ++r) {
+                for (size_t c = 0; c < map_json["data"][r].Size(); ++c)
+                    entity_cache[r][c].clear();
+                delete[] entity_cache[r];
             }
-            if ((current_tile.top_tile == "td:none") && (current_tile.top != "td:none")) {
-                add_tile_enity(
-                    agent,
-                    map_entity_name+":top",
-                    current_tile.top,
-                    current_tile.x,
-                    current_tile.y,
-                    current_tile.height-1
-                );
-            }
+            delete[] entity_cache;
+            return;
+        }
+    } else {
+        for (size_t index = 0; index < rows; ++index) {
+            entity_cache[index] = new std::vector<RenderAgentEntity>[map_json["data"][index].Size()];
+            make_row_entitys(map_data[index], map_json["data"][index].Size(), index);
         }
     }
 
+    LOG(LogLevel::Info, "Adding Entitys..");
+    for (size_t r = 0; r < rows; ++r) {
+        const auto row_size = map_json["data"][r].Size();
+        for (size_t c = 0; c < row_size; ++c) {
+            int height_index = 0;
+            for (RenderAgentEntity& current_entity : entity_cache[r][c]) {
+                const auto [surrounding_height_top, surrounding_height_bottom, surrounding_height_left, surrounding_height_right] = get_surrounding(r, c);
+                int surrounding_height = std::min(
+                    surrounding_height_bottom,
+                    surrounding_height_right
+                );
+                if (surrounding_height <= height_index+1) {
+                    RenderAgentEntity& top_entity = entity_cache[r][c].back();
+                    if (
+                        (top_entity.name == current_entity.name) ||
+                        (surrounding_height < height_index)
+                    ) {
+                        if (current_entity.layer == -1) {
+                            agent->heighest_layer = agent->heighest_layer+1;
+                            current_entity.layer = agent->heighest_layer;
+                        }
+                        agent->agent_entitys.insert(current_entity.name, current_entity, -1, false);
+                    }
+                } else {
+                    //LOG(LogLevel::Debug, "Skipping tile \"%s\"", current_entity.name.c_str());
+                }
+                height_index++;
+            }
+            entity_cache[r][c].clear();
+        }
+    }
+
+    LOG(LogLevel::Info, "Subdividing quadtree..");
+    agent->trigger_subdivision();
+
     // CLEANUP //
+    for (size_t r = 0; r < rows; ++r)
+        delete[] entity_cache[r];
+    delete[] entity_cache;
     if (map_json.HasMember("declarations")) {
         if (map_json["declarations"].HasMember("textures")) {
             for (const auto& declaration : map_json["declarations"]["textures"].GetObject()) {
@@ -330,18 +335,83 @@ bool Map::load_row(const rapidjson::GenericValue<rapidjson::UTF8<>>& row_json, c
         tile_textures.insert(current_tile.base);
         tile_textures.insert(current_tile.top_tile);
         tile_textures.insert(current_tile.top);
-    
-        /*
-        std::string map_entity_name = "map:"+map_name+":tile:"+std::to_string(current_tile.x)+"x"+std::to_string(current_tile.y);
-        for (int height_index = 0; height_index < current_tile.height; ++height_index) {
-            if (DEBUG["all_debug_logs"].get<bool>()) LOG(LogLevel::Debug, "Entity %s: height_index = %d; y = %d - 16*%d + 11*%d = %d", map_entity_name.c_str(), height_index, current_tile.y, height_index, current_tile.x, current_tile.y-(16*height_index)+(11*current_tile.x));
-            if ((current_tile.top_tile != "td:none") && (height_index == current_tile.height-1)) {
-                agent->add_entity(map_entity_name+":top_tile", current_tile.top_tile, "default", 16*(current_tile.x-current_tile.y), 11*(current_tile.y+current_tile.x)-(16*height_index), current_tile.size*4);
-            } else {
-                agent->add_entity(map_entity_name+":base", current_tile.base, "default", 16*(current_tile.x-current_tile.y), 11*(current_tile.y+current_tile.x)-(16*height_index), current_tile.size*4);
+    }
+    return true;
+}
+
+RenderAgentEntity Map::make_tile_entity(const std::string& name, const std::string& sprite_id, const int& x, const int& y, const int& height_index) {
+    RenderAgentSprite* sprite = agent->get_sprite(sprite_id);
+    if (sprite == nullptr) {
+        LOG(LogLevel::Warning, "While making entity \"%s\": sprite \"%s\" does not exist.", name.c_str(), sprite_id.c_str());
+        sprite = agent->get_sprite("td:missing_tile");
+    }
+
+    int width = 32;
+    int height = 37;
+    std::string selected_animation = "default";
+    if (sprite != nullptr) {
+        width = sprite->max.w;
+        height = sprite->max.h;
+        std::vector<std::string> keys;
+        for (auto& [key, animation] : sprite->animations) {
+            if (key.rfind("alt", 0) == 0) {
+                keys.push_back(key);
             }
         }
-        
+        if (!keys.empty()) {
+            int random_index = SDL_rand(keys.size());
+            selected_animation = keys[random_index];
+        }
+    }
+
+    return RenderAgentEntity(
+        name,
+        sprite_id,
+        selected_animation,
+        (16*(x-y)),
+        (11*(y+x)-(16*height_index)),
+        width,
+        height,
+        -1,
+        0,
+        false
+    );
+}
+
+bool Map::make_row_entitys(MapTile row[], size_t row_size, int row_index) {
+    for (size_t col_index = 0; col_index < row_size; ++col_index) {
+        MapTile& current_tile = row[col_index];
+        std::string map_entity_name = "map:"+map_name+":tile:"+std::to_string(current_tile.x)+"x"+std::to_string(current_tile.y);
+        for (int height_index = 0; height_index < current_tile.height; ++height_index) {
+            if ((current_tile.top_tile != "td:none") && (height_index == current_tile.height-1)) {
+                entity_cache[row_index][col_index].push_back(make_tile_entity(
+                    map_entity_name+":top_tile",
+                    current_tile.top_tile,
+                    current_tile.x,
+                    current_tile.y,
+                    height_index
+                ));
+            } else {
+                entity_cache[row_index][col_index].push_back(make_tile_entity(
+                    map_entity_name+":base-"+std::to_string(height_index),
+                    current_tile.base,
+                    current_tile.x,
+                    current_tile.y,
+                    height_index
+                ));
+            }
+        }
+        if ((current_tile.top_tile == "td:none") && (current_tile.top != "td:none")) {
+            entity_cache[row_index][col_index].push_back(make_tile_entity(
+                map_entity_name+":top",
+                current_tile.top,
+                current_tile.x,
+                current_tile.y,
+                current_tile.height-1
+            ));
+        }
+
+        /*
         // Loading building // // TODO: load any actor
         if (row_json[col_index].IsArray() && (row_json[col_index].Size() > 1)) {
             if (row_json[col_index].Size() > 2) {

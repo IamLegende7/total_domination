@@ -23,17 +23,13 @@ else:
 contents = {
     "name": "Map loading benchmark",
     "description": "A super big map for benchmarking map loading. Made with resources/utils/make_benchmark_map.py",
-    "declarations": {
-        "textures": {
-            "map:dirt_grass": [{"texture": "td:dirt", "x": 0, "y": 0}, {"texture": "td:top_grass", "x": 0, "y": 0}]
-        }
-    },
+    "declarations": {},
     "data": []
 }
 
 row = []
 for i in range(size):
-    row.append({"base": "td:dirt", "top_tile": "map:dirt_grass", "height": height})
+    row.append({"base": "td:dirt", "top": "td:top_grass", "height": height})
 
 for i in range(size):
     contents["data"].append(row)

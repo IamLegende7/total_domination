@@ -146,7 +146,7 @@ RenderAgentSprite* RenderAgent::get_sprite(const std::string& id, bool suppress_
     return nullptr;
 }
 
-bool RenderAgent::add_entity(const std::string& id, const std::string& sprite_id, const std::string& animation, const int& x, const int& y, const int& layer, const int& rotation, bool hidden) {
+bool RenderAgent::add_entity(const std::string& id, const std::string& sprite_id, const std::string& animation, const int& x, const int& y, const int& layer, const int& rotation, bool hidden, bool movable, bool allow_subdivision) {
     const RenderAgentSprite* sprite = get_sprite(sprite_id);
     if (sprite == nullptr) {
         LOG(LogLevel::Warning, "Could not add entity \"%s\": sprite \"%s\" does not exist.", id.c_str(), sprite_id.c_str());
@@ -163,7 +163,14 @@ bool RenderAgent::add_entity(const std::string& id, const std::string& sprite_id
         entity_layer = layer;
     }
     //LOG(LogLevel::Debug, "Added new entity %s: X: %d, Y: %d, layer: %d, rotation: %d", id.c_str(), x, y, entity_layer, rotation);
-    return agent_entitys.insert(id, RenderAgentEntity(id, sprite_id, animation, x, y, width, height, entity_layer, rotation, hidden));
+    int depth = -1;
+    if (movable)
+        depth = 0;
+    return agent_entitys.insert(id, RenderAgentEntity(id, sprite_id, animation, x, y, width, height, entity_layer, rotation, hidden), depth, allow_subdivision);
+};
+
+bool RenderAgent::trigger_subdivision() {
+    return agent_entitys.trigger_subdivision();
 };
 
 bool RenderAgent::render(const int zoom, const int x_offset, const int y_offset, const bool clear_renderer, const int resolution, SDL_Color clear_colour) {
@@ -207,7 +214,12 @@ bool RenderAgent::render(const int zoom, const int x_offset, const int y_offset,
                 return a->layer < b->layer;
             }
         );
+        //LOG(LogLevel::Debug, "%d entitys to render", entitys_on_screen.size());
         for (const RenderAgentEntity* entity : entitys_on_screen) {
+            if (entity == nullptr) {
+                LOG(LogLevel::Warning, "nullptr in entitys_on_screen");
+                continue;
+            }
             if (entity->hidden)
                 continue;
 
@@ -246,7 +258,7 @@ bool RenderAgent::render(const int zoom, const int x_offset, const int y_offset,
 
         // Quadtree renderring
         if (DEBUG["show_quadtree"].get<bool>()) {
-            agent_entitys.render(renderer, x_offset, y_offset, zoom);
+            agent_entitys.render(renderer, x_offset, y_offset, zoom, resolution);
         }
         entitys_on_screen.clear();
     }

@@ -123,9 +123,7 @@ class RenderAgent {
     private:
         std::unordered_map<std::string, RenderAgentTexture> agent_textures;
         std::unordered_map<std::string, RenderAgentSprite> agent_sprites;
-        QuadtreeNode<RenderAgentEntity> agent_entitys;
 
-        int heighest_layer = -1;
         SDL_Renderer* renderer;
 
         SDL_Texture* target[12] = {nullptr}; // Render to this texture first before writing that to the screen
@@ -138,6 +136,10 @@ class RenderAgent {
         std::vector<Text> texts;
         
     public:
+        QuadtreeNode<RenderAgentEntity> agent_entitys;
+        
+        int heighest_layer = -1;
+
         bool dirty[12] = {true};
         int map_width;
         int map_height;
@@ -163,7 +165,8 @@ class RenderAgent {
         RenderAgentSprite* get_sprite(const std::string& id, bool suppress_logs=false);
 
         // Entitys
-        bool add_entity(const std::string& id, const std::string& sprite_id, const std::string& animation, const int& x, const int& y, const int& layer=-1, const int& rotation=0, bool hidden=false);
+        bool add_entity(const std::string& id, const std::string& sprite_id, const std::string& animation, const int& x, const int& y, const int& layer=-1, const int& rotation=0, bool hidden=false, bool movable=false, bool allow_subdivision=true);
+        bool trigger_subdivision();
         RenderAgentEntity* get_entity(const std::string& id, bool suppress_logs=false);
 
         // Text
