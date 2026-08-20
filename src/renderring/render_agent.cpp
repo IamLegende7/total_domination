@@ -105,13 +105,13 @@ bool RenderAgent::add_sprite(const std::string& id, const std::string& texture_i
     }
     agent_sprites[id] = RenderAgentSprite(texture_id, animations);
     LOG(LogLevel::Debug, "Added new Sprite %s", id.c_str());
-    for (const auto& [key, animation] : animations) {
+    /*for (const auto& [key, animation] : animations) {
         LOG(LogLevel::Debug, "   %s", key.c_str());
         for (int i = 0; i < 12; ++i) {
             const SDL_Rect& rect = animation.texture_rects[i];
             LOG(LogLevel::Debug, "      Frame %d: %d, %d, %d, %d", i, rect.x, rect.y, rect.w, rect.h);
         }
-    }
+    }*/
     return true;
 }
 

@@ -9,14 +9,14 @@ total_domination-linux.tar.gz
 total_domination-windows.zip
 
 # Logs
-data/logs/crashes/*
-data/logs/current.log
+data/logs/crashes/*.log
+data/logs/*.log
 data/logs/atlas-*.png
 
 # dev
 .development
 core*
-test*
+**__pycache__
 
 # a 2000x2000 Map too large for github:
 resources/maps/testing/benchmark2.jsonc

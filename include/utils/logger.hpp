@@ -95,8 +95,8 @@ class Logger {
             timeStream << seconds << '.' << std::setfill('0') << std::setw(3) << milliseconds;
 
             std::string timestamp = timeStream.str();
-            std::string full_log        = prefix + ": [" + timestamp + "]" + "[" + file.filename().string() + ":" + std::string(func) + "] " + message;
-            std::string full_log_colour = color_code + prefix + "\033[0m" + ": [" + timestamp + "]" + "[" + file.filename().string() + ":" + std::string(func) + "] " + message;
+            std::string full_log = prefix + ": [" + timestamp + "]" + "[" + file.filename().u8string() + ":" + std::string(func) + "] " + message;
+            std::string full_log_colour = color_code + prefix + "\033[0m" + ": [" + timestamp + "]" + "[" + file.filename().u8string() + ":" + std::string(func) + "] " + message;
 
             if (log_file.is_open()) {
                 log_file << full_log << std::endl;  

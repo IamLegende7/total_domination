@@ -57,6 +57,9 @@ inline void init_locations_settings(const std::filesystem::path& config_file) {
     // Registry //
     LOCATIONS["units_json"] =           Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Registry", "units_json")));
     LOCATIONS["tiles_json"] =           Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Registry", "tiles_json")));
+    // Mods //
+    LOCATIONS["mod_dir"] =              Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Mods", "mod_dir")));
+    LOCATIONS["mod_server_path"] =      Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Mods", "mod_server_path")));
 }
 
 #endif

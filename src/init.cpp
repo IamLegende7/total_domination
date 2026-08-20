@@ -6,6 +6,11 @@
 #include <SDL3_shadercross/SDL_shadercross.h>
 #include <SDL3/SDL_stdinc.h>
 
+#include "rapidjson/document.h"
+#include "rapidjson/rapidjson.h"
+#include "rapidjson/writer.h"
+#include "rapidjson/stringbuffer.h"
+
 #include <string>
 #include <filesystem>
 
@@ -16,6 +21,7 @@
 #include "inputs/inputs.hpp"
 #include "renderring/render_agents.hpp"
 #include "renderring/textures.hpp"
+#include "mods/mods.hpp"
 #include "utils/logger.hpp"
 
 #include "settings/info.h"
@@ -78,6 +84,7 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
 
 
     // WINDOW //
+    LOG(LogLevel::Info, "Creating Window..");
     std::string windowTitle = INFO_NAME + " - " + INFO_VERSION.toString();
     WINDOW = SDL_CreateWindow(windowTitle.c_str(), SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_RESIZABLE);
     if (WINDOW == NULL) {
@@ -92,6 +99,7 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
 
     if (RENDER_SETTINGS["render_mode"].get<int>() == 1) {
         // RENDERER //
+        LOG(LogLevel::Info, "Creating Renderer..");
         RENDERER = SDL_CreateRenderer(WINDOW, SDL_GPU_RENDERER);
         if (RENDERER == NULL) {
             LOG(LogLevel::Error, "Renderer could not be created: %s", SDL_GetError());
@@ -102,6 +110,7 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
 
         // VSYNC //
         if (RENDER_SETTINGS["vsync"].get<bool>()) {
+            LOG(LogLevel::Info, "Enabling VSync..");
             if (!SDL_SetRenderVSync(RENDERER, 1)) {
                 LOG(LogLevel::Error, "VSync could not be enabled: %s", SDL_GetError());
             }
@@ -118,6 +127,7 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
     }
 
     // Render Agents //
+    LOG(LogLevel::Info, "Creating RenderAgents..");
     MAIN_RENDER_AGENT = new RenderAgent(RENDERER);
     UI_RENDER_AGENT = new RenderAgent(RENDERER, true);
 
@@ -137,7 +147,19 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
     CURRENT_RENDER_STATE = set_render_state(RENDERER, RENDER_SETTINGS["shader"].get<std::filesystem::path>(), RENDER_STATES);
 
     // TTF font loading //
+    LOG(LogLevel::Info, "Loading Fonts..");
     UI_RENDER_AGENT->add_font("def_font", SETTINGS["font"].get<std::filesystem::path>(), (float)(SETTINGS["font_size"].get<int>()/10));
+
+    // Mod Server //
+    LOG(LogLevel::Info, "Starting ModServer..");
+    MOD_SERVER = new ModServer();
+    ModServerResponse response = MOD_SERVER->load_mod(LOCATIONS["mod_dir"].get<std::filesystem::path>()/std::filesystem::path("td"));
+    if (response.status == 0) {
+        LOG(LogLevel::Info, "ModServer: Code %d: \"%s\"", response.status, response.message.c_str());
+    } else {
+        LOG(LogLevel::Critical, "Mod server connection could not be established: Code %d: \"%s\"", response.status, response.message.c_str());
+        return SDL_APP_FAILURE;
+    }
 
     // Seeding SDL_rand
     SDL_srand(0);
@@ -145,23 +167,62 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
     LOG(LogLevel::Info, "Setup all done!");
 
     // TESTS //
-    LOG(LogLevel::Info, "Running tests..");
-    if (DEBUG["test_logger"].get<bool>()) {
-        LOG(LogLevel::Debug,    "Testing Logger");
-        LOG(LogLevel::Info,     "Testing Logger");
-        LOG(LogLevel::Warning,  "Testing Logger");
-        LOG(LogLevel::Error,    "Testing Logger");
-        LOG(LogLevel::Critical, "Testing Logger");
-    }
+    if (
+        DEBUG["test_mod_server"].get<bool>() ||
+        DEBUG["test_logger"].get<bool>() ||
+        DEBUG["print_locations"].get<bool>()
+    )
+    {
+        LOG(LogLevel::Info, "Running tests..");
+        
+        if (DEBUG["test_mod_server"].get<bool>()) {
+            response = MOD_SERVER->status();
+            if (response.status == 0) {
+                LOG(LogLevel::Info, "Mod server reports: Code %d: \"%s\"", response.status, response.message.c_str());
+            } else {
+                LOG(LogLevel::Critical, "Mod server connection could not be established: Code %d: \"%s\"", response.status, response.message.c_str());
+                return SDL_APP_FAILURE;
+            }
 
-    if (DEBUG["print_locations"].get<bool>()) {
-        for (auto& [key, setting] : LOCATIONS) {
-            std::string current_value_str = setting.get<std::filesystem::path>().u8string();
-            LOG(LogLevel::Debug, "%s: \"%s\"", key.c_str(), current_value_str.c_str());
+            const std::string mod = "td";
+            const std::string function = "test_echo";
+
+            rapidjson::Document args(rapidjson::kArrayType);
+            rapidjson::Value str_obj;
+            str_obj.SetString("Test!", args.GetAllocator());
+            args.PushBack(str_obj, args.GetAllocator());
+
+            response = MOD_SERVER->execute(mod, function, args);
+            if (response.status == 0) {
+                rapidjson::StringBuffer buffer;
+                rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+                response.data.Accept(writer);
+                LOG(LogLevel::Info, "Mod server reports: Code %d: \"%s\", data: %s", response.status, response.message.c_str(), buffer.GetString());
+            } else {
+                LOG(LogLevel::Error, "Mod server test failed: Code %d: \"%s\"", response.status, response.message.c_str());
+            }
         }
+
+        if (DEBUG["test_logger"].get<bool>()) {
+            LOG(LogLevel::Debug,    "Testing Logger");
+            LOG(LogLevel::Info,     "Testing Logger");
+            LOG(LogLevel::Warning,  "Testing Logger");
+            LOG(LogLevel::Error,    "Testing Logger");
+            LOG(LogLevel::Critical, "Testing Logger");
+            rapidjson::Document args;
+            MOD_SERVER->execute("td", "test_logger", args);
+        }
+
+        if (DEBUG["print_locations"].get<bool>()) {
+            for (auto& [key, setting] : LOCATIONS) {
+                std::string current_value_str = setting.get<std::filesystem::path>().u8string();
+                LOG(LogLevel::Debug, "%s: \"%s\"", key.c_str(), current_value_str.c_str());
+            }
+        }
+
+        LOG(LogLevel::Info, "All good; have fun!");
     }
 
-    LOG(LogLevel::Info, "All good; have fun!");
     return SDL_APP_CONTINUE;
 }
 
@@ -232,4 +293,3 @@ void quit(void *appstate, SDL_AppResult result) {
     }
     SDL_Quit();
 }
-
