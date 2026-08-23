@@ -129,6 +129,7 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
     // Render Agents //
     LOG(LogLevel::Info, "Creating RenderAgents..");
     MAIN_RENDER_AGENT = new RenderAgent(RENDERER);
+    ACTORS_RENDER_AGENT = new RenderAgent(RENDERER);
     UI_RENDER_AGENT = new RenderAgent(RENDERER, true);
 
     // Window icon //
@@ -276,6 +277,8 @@ void quit(void *appstate, SDL_AppResult result) {
 
     delete MAIN_MAP;
     delete MAIN_RENDER_AGENT;
+    delete ACTORS_RENDER_AGENT;
+    delete UI_RENDER_AGENT;
     delete INPUTS;
 
     if (RENDERER != NULL) {

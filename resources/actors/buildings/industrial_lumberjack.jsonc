@@ -6,10 +6,16 @@
     "attack_value": 0,
     "defence_value": 10,
     "code": {
-        "round": [{
-            "function": "td:produce_item",
-            "arguments": ["td:wood"]
-        }],
+        "round": [
+            {
+                "function": "td:produce_item",
+                "arguments": ["td:wood"]
+            },
+            {
+                "function": "td:produce_item",
+                "arguments": ["td:wood"]
+            }
+        ],
         "creation": [{
             "function": "td:remove_forest_tile",
             "arguments": ["$x$", "$y$"]

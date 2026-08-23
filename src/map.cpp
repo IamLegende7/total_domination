@@ -381,7 +381,7 @@ RenderAgentEntity Map::make_tile_entity(const std::string& name, const std::stri
 bool Map::make_row_entitys(MapTile row[], size_t row_size, int row_index) {
     for (size_t col_index = 0; col_index < row_size; ++col_index) {
         MapTile& current_tile = row[col_index];
-        std::string map_entity_name = "map:"+map_name+":tile:"+std::to_string(current_tile.x)+"x"+std::to_string(current_tile.y);
+        std::string map_entity_name = "map:tile:"+std::to_string(current_tile.x)+"x"+std::to_string(current_tile.y);
         for (int height_index = 0; height_index < current_tile.height; ++height_index) {
             if ((current_tile.top_tile != "td:none") && (height_index == current_tile.height-1)) {
                 entity_cache[row_index][col_index].push_back(make_tile_entity(

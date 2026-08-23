@@ -23,9 +23,13 @@ struct ModServerRequest {
 
 namespace ModServerFunctions {
     void log(rapidjson::Value& args,rapidjson::Document& output);
+    void get_resource(rapidjson::Value& args, rapidjson::Document& output);
+    void set_resource(rapidjson::Value& args, rapidjson::Document& output);
 
     inline std::unordered_map<std::string, std::function<void(rapidjson::Value&,rapidjson::Document&)>> functions = {
-        {"LOG", ModServerFunctions::log}
+        {"LOG", ModServerFunctions::log},
+        {"get_resource", ModServerFunctions::get_resource},
+        {"set_resource", ModServerFunctions::set_resource}
     };
 };
 

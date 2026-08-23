@@ -15,10 +15,12 @@
 
 #include "settings/locations.hpp"
 
-ActorHandler::ActorHandler(RenderAgent* agent) {
+ActorHandler::ActorHandler(RenderAgent* agent, RenderAgent* map_agent) {
     this->agent = agent;
+    this->map_agent = map_agent;
     instances.set_capacity(16);
-    instances.set_dimensions(agent->agent_entitys.x, agent->agent_entitys.y, agent->agent_entitys.width, agent->agent_entitys.height);
+    agent->agent_entitys.set_dimensions(map_agent->agent_entitys.x, map_agent->agent_entitys.y, map_agent->agent_entitys.width, map_agent->agent_entitys.height);
+    instances.set_dimensions(map_agent->agent_entitys.x, map_agent->agent_entitys.y, map_agent->agent_entitys.width, map_agent->agent_entitys.height);
 }
 
 ActorHandler::~ActorHandler() {};
@@ -122,6 +124,10 @@ Actor* ActorHandler::get_actor(const std::string& id, bool suppress_logs) {
 }
 
 bool ActorHandler::spawn_actor(const std::string& id, const int& col, const int& row) {
+    if (get_instance(col, row, true) != nullptr) {
+        LOG(LogLevel::Warning, "Could not spawn instance of actor \"%s\" at %d %d: an instance already exists at that tile.", id.c_str(), col, row);
+        return false;
+    }
     if (get_actor(id, true) == nullptr) {
         if (!load_actor(id)) {
             LOG(LogLevel::Warning, "Could not spawn instance of actor \"%s\" at %d %d: could not add actor.", id.c_str(), col, row);
@@ -133,17 +139,34 @@ bool ActorHandler::spawn_actor(const std::string& id, const int& col, const int&
         LOG(LogLevel::Warning, "Could not spawn instance of actor \"%s\" at %d %d: parent not loaded.", id.c_str(), col, row);
         return false;
     }
-    std::vector<ActorInstance*> instances_same_actor;
-    instances.query_by_id(id, instances_same_actor);
-    const std::string entity_id = id + std::string("-") + std::to_string(instances_same_actor.size());
+    std::vector<ActorInstance*> all_instances;
+    int instances_same_actor_count = 0;
+    instances.query_all(all_instances);
+    for (auto& entry : all_instances) {
+        if (entry->id == id)
+            instances_same_actor_count++;
+    }
+    const std::string entity_id = id + std::string("-") + std::to_string(instances_same_actor_count);
     MapTile* tile = MAIN_MAP->get_tile(row, col);
     if (tile == nullptr) {
         LOG(LogLevel::Warning, "Could not spawn instance of actor \"%s\" at %d %d: tile does not exist.", id.c_str(), col, row);
         return false;
     }
+    std::string map_entity_name = "map:tile:"+std::to_string(col)+"x"+std::to_string(row);
+    RenderAgentEntity* map_tile_entity = map_agent->get_entity(map_entity_name+":top", true);
+    if (map_tile_entity == nullptr) {
+        map_tile_entity = map_agent->get_entity(map_entity_name+":top_tile", true);
+        if (map_tile_entity == nullptr) {
+            map_tile_entity = map_agent->get_entity(map_entity_name+":base", true);
+            if (map_tile_entity == nullptr) {
+                LOG(LogLevel::Warning, "Could not spawn instance of actor \"%s\" at %d %d: tile entity does not exist.", id.c_str(), col, row);
+                return false;
+            }
+        }
+    }
     int x = (16*(col-row));
     int y = (11*(row+col)-(16*(tile->height-1)))-11;
-    agent->add_entity(entity_id, parent->sprite, "default", x, y);
+    agent->add_entity(entity_id, parent->sprite, "default", x, y, map_tile_entity->layer+2);
     ActorInstance instance = {
         id,
         parent,
@@ -159,13 +182,15 @@ bool ActorHandler::spawn_actor(const std::string& id, const int& col, const int&
     int max_depth = -1;
     if (instance.movement_speed > 0)
         max_depth = 0;
-    instances.insert(id, instance, max_depth, true);
+    instances.insert(entity_id, instance, max_depth, true);
+    //LOG(LogLevel::Debug, "Spawned instance of \"%s\" at %d %d. Length is now: %d", id.c_str(), col, row, all_instances.size());
+    agent->set_dirty();
     return true;
 }
 
-ActorInstance* ActorHandler::get_instance(const std::string& id, const int& col, const int& row, bool suppress_logs) {
+ActorInstance* ActorHandler::get_instance(const int& col, const int& row, bool suppress_logs) {
     std::vector<ActorInstance*> result;
-    instances.query_by_id(id, result);
+    instances.query_all(result);
     if (result.size() > 0) {
         for (ActorInstance* instance : result) {
             if (
@@ -177,7 +202,7 @@ ActorInstance* ActorHandler::get_instance(const std::string& id, const int& col,
     }
 
     if (!suppress_logs)
-        LOG(LogLevel::Warning, "Requested non-existent instance \"%s\" at %d %d", id.c_str(), col, row);
+        LOG(LogLevel::Warning, "Requested non-existent instance at %d %d", col, row);
     return nullptr;
 }
 

@@ -94,9 +94,10 @@ void ModServer::handle_function_request(ModServerResponse& function_request) {
                 break;
             }
         }
-        if (!found)
+        if (!found) {
+            LOG(LogLevel::Warning, "Requested function \"%s\" not found.", function_str.c_str());
             status.SetInt(2);
-        else
+        } else
             status.SetInt(0);
     }
 

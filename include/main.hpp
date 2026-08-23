@@ -40,4 +40,9 @@ inline int UI_ZOOM = 4;
 inline int TILE_SELECTION_X = -1;
 inline int TILE_SELECTION_Y = -1;
 
+// Players
+inline int CURRENT_PLAYER = 0;
+inline int THIS_PLAYER = 0;
+inline int PLAYER_COUNT = 2;
+
 #endif

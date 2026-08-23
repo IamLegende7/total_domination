@@ -1,3 +1,6 @@
+#ifndef ACTORS_HPP
+#define ACTORS_HPP
+
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -40,10 +43,11 @@ struct ActorInstance {
 class ActorHandler {
     private:
         RenderAgent* agent = nullptr;
+        RenderAgent* map_agent = nullptr;
         std::deque<Actor> actors;
         QuadtreeNode<ActorInstance> instances;
     public:
-        ActorHandler(RenderAgent* agent);
+        ActorHandler(RenderAgent* agent, RenderAgent* map_agent);
         ~ActorHandler();
 
         // Actors
@@ -53,8 +57,10 @@ class ActorHandler {
         // ActorInstances
         int get_instance_count(const std::string& id);
         bool spawn_actor(const std::string& id, const int& col, const int& row);
-        ActorInstance* get_instance(const std::string& id, const int& col, const int& row, bool suppress_logs=false);
+        ActorInstance* get_instance(const int& col, const int& row, bool suppress_logs=false);
 
         // Actor functions
         bool round();
 };
+
+#endif

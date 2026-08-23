@@ -8,6 +8,7 @@ namespace TDKeybind {
     void tile_selection_right();
     void reload();
     void next_round();
+    void spawn_lumberjack();
 }
 
 #endif

@@ -10,7 +10,6 @@
 #include <memory>
 #include <filesystem>
 
-#include "main.hpp"
 #include "ui.hpp"
 #include "renderring/shaders.hpp"
 

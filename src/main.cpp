@@ -13,6 +13,7 @@
 
 #include "main.hpp"
 #include "map.hpp"
+#include "player.hpp"
 #include "inputs/inputs.hpp"
 #include "agents.hpp"
 #include "renderring/textures.hpp"
@@ -156,18 +157,23 @@ SDL_AppResult SDL_AppIterate(void* appState) {
                     }
                 }
 
-                ACTOR_HANDLERS[0] = new ActorHandler(MAIN_RENDER_AGENT);
-                ACTOR_HANDLERS[1] = new ActorHandler(MAIN_RENDER_AGENT);
-                ACTOR_HANDLERS[0]->spawn_actor("td:industrial_lumberjack", 0, 0);
+                for (int i = 0; i < 2; ++i) {
+                    PLAYERS.push_back(Player(i, std::to_string(i), "td:human"));
+                }
+                CURRENT_PLAYER = 0;
+                THIS_PLAYER = 0;
+                ROUND = 0;
+                last_round = 0;
 
                 MAIN_RENDER_AGENT->set_dirty();
+                ACTORS_RENDER_AGENT->set_dirty();
                 UI_RENDER_AGENT->set_dirty();
                 MODE = 1;
             }
         } else if (MODE == 1) {
             if (ROUND != last_round) {
                 LOG(LogLevel::Debug, "Current round is %d.", ROUND);
-                ACTOR_HANDLERS[0]->round();
+                PLAYERS[CURRENT_PLAYER].actor_handler->round();
                 last_round = ROUND;
             }
         }
@@ -192,9 +198,11 @@ SDL_AppResult SDL_AppIterate(void* appState) {
         // TODO
     } else if (MODE == 1) {
         bool changed_main = MAIN_RENDER_AGENT->render(CAMERA.zoom, CAMERA.x, CAMERA.y, true, RENDER_SETTINGS["resolution"].get<int>());
+        bool changed_actors = ACTORS_RENDER_AGENT->render(CAMERA.zoom, CAMERA.x, CAMERA.y, true, RENDER_SETTINGS["resolution"].get<int>(), {0, 0, 0, 0});
         bool changed_ui = UI_RENDER_AGENT->render(UI_ZOOM, 0, 0, true, RENDER_SETTINGS["resolution"].get<int>(), {0, 0, 0, 0}); // TODO: Only overwrite the area of target tex of the old text if the text changes, not the whole target tex
-        if (changed_main || changed_ui || new_animation_frame) {
+        if (changed_main || changed_actors || changed_ui || new_animation_frame) {
             MAIN_RENDER_AGENT->render_target();
+            ACTORS_RENDER_AGENT->render_target();
             UI_RENDER_AGENT->render_target();
         }
         SDL_RenderPresent(RENDERER);
@@ -232,6 +240,7 @@ SDL_AppResult SDL_AppEvent(void* appState, SDL_Event* event) {
             }
         }
         MAIN_RENDER_AGENT->set_dirty();
+        ACTORS_RENDER_AGENT->set_dirty();
         UI_RENDER_AGENT->set_dirty();
     }
     INPUTS->update(event);

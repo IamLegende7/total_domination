@@ -14,7 +14,8 @@ inline Keybind keybind_constructors[] = {
     {"Movement", "tile_selection_right", "Move tile selection right", SDL_SCANCODE_D, TDKeybind::tile_selection_right, 2, 10},
     // Debug
     {"Debug", "reload", "Quick-reload settings", SDL_SCANCODE_R, TDKeybind::reload, -1},
-    {"Debug", "next_round", "Go to next round", SDL_SCANCODE_N, TDKeybind::next_round, -1}
+    {"Debug", "next_round", "Go to next round", SDL_SCANCODE_N, TDKeybind::next_round, -1},
+    {"Debug", "spawn_lumberjack", "Spawn a lumberjack", SDL_SCANCODE_M, TDKeybind::spawn_lumberjack, -1}
 };
 inline constexpr std::size_t keybind_constructors_count = sizeof(keybind_constructors)/sizeof(keybind_constructors[0]);
 

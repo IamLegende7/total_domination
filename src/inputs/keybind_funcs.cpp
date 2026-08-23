@@ -5,6 +5,7 @@
 #include "map.hpp"
 
 #include "agents.hpp"
+#include "player.hpp"
 #include "renderring/render_agent.hpp"
 
 // Reloading settings
@@ -51,25 +52,33 @@ namespace TDKeybind {
     void tile_selection_up() {
         if (TILE_SELECTION_Y > 0) {
             TILE_SELECTION_Y--;
-            MAIN_RENDER_AGENT->set_dirty(update_selected_tile());
+            bool update_status = update_selected_tile();
+            MAIN_RENDER_AGENT->set_dirty(update_status);
+            ACTORS_RENDER_AGENT->set_dirty(update_status);
         }
     }
     void tile_selection_down() {
         if (TILE_SELECTION_Y < (int)MAIN_MAP->rows-1) {
             TILE_SELECTION_Y++;
-            MAIN_RENDER_AGENT->set_dirty(update_selected_tile());
+            bool update_status = update_selected_tile();
+            MAIN_RENDER_AGENT->set_dirty(update_status);
+            ACTORS_RENDER_AGENT->set_dirty(update_status);
         }
     }
     void tile_selection_left() {
         if (TILE_SELECTION_X > 0) {
             TILE_SELECTION_X--;
-            MAIN_RENDER_AGENT->set_dirty(update_selected_tile());
+            bool update_status = update_selected_tile();
+            MAIN_RENDER_AGENT->set_dirty(update_status);
+            ACTORS_RENDER_AGENT->set_dirty(update_status);
         }
     }
     void tile_selection_right() {
         if (TILE_SELECTION_X < (int)MAIN_MAP->cols-1) {
             TILE_SELECTION_X++;
-            MAIN_RENDER_AGENT->set_dirty(update_selected_tile());
+            bool update_status = update_selected_tile();
+            MAIN_RENDER_AGENT->set_dirty(update_status);
+            ACTORS_RENDER_AGENT->set_dirty(update_status);
         }
     }
 
@@ -80,5 +89,8 @@ namespace TDKeybind {
     }
     void next_round() {
         ROUND++;
+    }
+    void spawn_lumberjack() {
+        PLAYERS[CURRENT_PLAYER].actor_handler->spawn_actor("td:industrial_lumberjack", TILE_SELECTION_X, TILE_SELECTION_Y);
     }
 }

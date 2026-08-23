@@ -5,8 +5,9 @@
 #include <unordered_map>
 
 #include "utils/json.hpp"
-#include "settings/locations.hpp"
 #include "utils/logger.hpp"
+#include "settings/locations.hpp"
+#include "main.hpp"
 
 std::filesystem::path get_texture_path(const std::string& name) {
     rapidjson::Document textures_json = open_json(LOCATIONS["textures_json"].get<std::filesystem::path>());

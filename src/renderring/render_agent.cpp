@@ -4,6 +4,8 @@
 #include <tuple>
 #include <filesystem>
 
+#include "main.hpp"
+
 #include "renderring/render_agent.hpp"
 #include "renderring/shaders.hpp"
 #include "ui.hpp"

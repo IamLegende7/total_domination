@@ -1,7 +1,8 @@
+import api
 from api import LogLevel
 
-def produce_item(mod, item_id: str):
-    mod.main_log(LogLevel.DEBG, f"Adding resource \"{item_id}\"")
+def produce_item(mod, item_id: str) -> int:
+    return api.set_resource(item_id, api.get_resource(item_id)+1)
 
 def remove_forest_tile(mod, tile_x: int, tile_y: int):
     pass
