@@ -301,6 +301,8 @@ RenderAgentTexture RenderAgent::bake_texture(TextureConstructor* texture_constru
         SDL_Texture* bake_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, surface_width, surface_height);
         SDL_SetTextureScaleMode(bake_texture, SDL_SCALEMODE_NEAREST);
         SDL_SetRenderTarget(renderer, bake_texture);
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+        SDL_RenderClear(renderer);
         for (int i = 0; i < array_size; ++i) {
             TextureConstructor* constructor = texture_constructors[i];
             SDL_FRect dstrect = {(float)(constructor->x*constructor->size), (float)(constructor->y*constructor->size), (float)(constructor->texture->width*constructor->size), (float)(constructor->texture->height*constructor->size)};
