@@ -4,7 +4,7 @@
 #include "main.hpp"
 #include "map.hpp"
 
-#include "renderring/render_agents.hpp"
+#include "agents.hpp"
 #include "renderring/render_agent.hpp"
 
 // Reloading settings
@@ -72,8 +72,13 @@ namespace TDKeybind {
             MAIN_RENDER_AGENT->set_dirty(update_selected_tile());
         }
     }
+
+    // tmp //
     void reload() {
         LOG(LogLevel::Info, "Reloading Settings...");
         load_settings();
+    }
+    void next_round() {
+        ROUND++;
     }
 }

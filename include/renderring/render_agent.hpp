@@ -161,7 +161,7 @@ class RenderAgent {
 
         // Sprites
         bool add_sprite(const std::string& id, const std::string& texture_id, const std::unordered_map<std::string, SpriteAnimation>& animations);
-        bool add_sprite(const std::string& id, const std::string& texture_id, const int& x, const int& y, const int& width=-1, const int& height=-1);
+        bool add_sprite(const std::string& id, const std::string& texture_id, const int& x=0, const int& y=0, const int& width=-1, const int& height=-1);
         RenderAgentSprite* get_sprite(const std::string& id, bool suppress_logs=false);
 
         // Entitys

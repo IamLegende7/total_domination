@@ -21,6 +21,7 @@ inline int ACTUAL_ANIMATION_FRAME_RATE = 0;
 // 0: main menu; 1: in-game, payer turn; 2: enemy turn; 3: pause menu
 inline int MODE = 0;
 inline bool PAUSE = false; // TODO: implement
+inline int ROUND = 0;
 
 inline int SCREEN_WIDTH = 640;
 inline int SCREEN_HEIGHT = 480;

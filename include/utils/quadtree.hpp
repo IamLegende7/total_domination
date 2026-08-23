@@ -222,6 +222,20 @@ class QuadtreeNode {
             return true;
         };
 
+        bool query_all(std::vector<T*>& result) {
+            for (const auto& [current_id, current_entry] : contents) {
+                if (current_entry.content != nullptr) {
+                    result.push_back(current_entry.content);
+                }
+            }
+            if (children[0] != nullptr) {
+                for (int i = 0; i < 4; ++i) {
+                    children[i]->query_all(result);
+                }
+            }
+            return true;
+        };
+
         bool render(SDL_Renderer* renderer, const int x_offset, const int y_offset, const int zoom, const int resolution, const SDL_Color& colour={200, 30, 210, 255}) { // TODO: don't render outside of view
             SDL_FRect rect = {
                 (float)std::ceil(((x - x_offset) * zoom) / resolution),

@@ -1,0 +1,22 @@
+{
+    "name": "Industrial Lumberjack",
+    "type": "td:economy_building",
+    "hp": 100,
+    "movement_speed": 0,
+    "attack_value": 0,
+    "defence_value": 10,
+    "code": {
+        "round": [{
+            "function": "td:produce_item",
+            "arguments": ["td:wood"]
+        }],
+        "creation": [{
+            "function": "td:remove_forest_tile",
+            "arguments": ["$x$", "$y$"]
+        }],
+        "death": [{
+            "function": "td:delete_actor",
+            "arguments": ["$id$"]
+        }]
+    }
+}

@@ -200,14 +200,18 @@ ModServerResponse ModServer::execute(const std::string& mod, const std::string& 
     };
     rapidjson::Value json_mod;
     rapidjson::Value json_function;
+    rapidjson::Value json_args;
+
+    rapidjson::Document::AllocatorType& allocator = request.data.GetAllocator();
 
     request.data.SetObject();
-    json_mod.SetString(mod.c_str(), request.data.GetAllocator());
-    json_function.SetString(function.c_str(), request.data.GetAllocator());
+    json_mod.SetString(mod.c_str(), allocator);
+    json_function.SetString(function.c_str(), allocator);
+    json_args.CopyFrom(args, allocator);
 
-    request.data.AddMember("mod", json_mod, request.data.GetAllocator());
-    request.data.AddMember("function", json_function, request.data.GetAllocator());
-    request.data.AddMember("args", args, request.data.GetAllocator());
+    request.data.AddMember("mod", json_mod, allocator);
+    request.data.AddMember("function", json_function, allocator);
+    request.data.AddMember("args", json_args, allocator);
     
     MOD_SERVER->make_request(request);
     return MOD_SERVER->get_response();

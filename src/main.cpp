@@ -14,7 +14,7 @@
 #include "main.hpp"
 #include "map.hpp"
 #include "inputs/inputs.hpp"
-#include "renderring/render_agents.hpp"
+#include "agents.hpp"
 #include "renderring/textures.hpp"
 #include "renderring/shaders.hpp"
 #include "utils/logger.hpp"
@@ -37,6 +37,8 @@ SDL_AppResult SDL_AppIterate(void* appState) {
     static int elapsed_time_tick_rate = 0;
     static int elapsed_time_frame_rate = 0;
     static int elapsed_animation_frame_rate = 0;
+
+    static int last_round = ROUND;
 
     Uint32 current_time = SDL_GetTicks();
     int delta_time = current_time - last_time;
@@ -113,6 +115,7 @@ SDL_AppResult SDL_AppIterate(void* appState) {
                 // map loading:
                 // TODO: move to dedecated function
                 MAIN_MAP = new Map(MAIN_RENDER_AGENT, DEBUG["force_load_map"].get<std::filesystem::path>());
+
                 CAMERA.zoom = SETTINGS["initial_camera_zoom"].get<int>();
                 int y = 20;
                 if (DEBUG["show_fps"].get<bool>()) {
@@ -151,10 +154,21 @@ SDL_AppResult SDL_AppIterate(void* appState) {
                         CAMERA.x = (selected_tile_top->x+(int)(selected_tile_top_rect.w/2))-(int)((SCREEN_WIDTH/2)/CAMERA.zoom);
                         CAMERA.y = (selected_tile_top->y+(int)(selected_tile_top_rect.h/2))-(int)((SCREEN_HEIGHT/2)/CAMERA.zoom);
                     }
-                    MAIN_RENDER_AGENT->set_dirty();
-                    UI_RENDER_AGENT->set_dirty();
                 }
+
+                ACTOR_HANDLERS[0] = new ActorHandler(MAIN_RENDER_AGENT);
+                ACTOR_HANDLERS[1] = new ActorHandler(MAIN_RENDER_AGENT);
+                ACTOR_HANDLERS[0]->spawn_actor("td:industrial_lumberjack", 0, 0);
+
+                MAIN_RENDER_AGENT->set_dirty();
+                UI_RENDER_AGENT->set_dirty();
                 MODE = 1;
+            }
+        } else if (MODE == 1) {
+            if (ROUND != last_round) {
+                LOG(LogLevel::Debug, "Current round is %d.", ROUND);
+                ACTOR_HANDLERS[0]->round();
+                last_round = ROUND;
             }
         }
         INPUTS->process();

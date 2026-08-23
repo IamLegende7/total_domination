@@ -19,7 +19,7 @@
 #include "main.hpp"
 #include "map.hpp"
 #include "inputs/inputs.hpp"
-#include "renderring/render_agents.hpp"
+#include "agents.hpp"
 #include "renderring/textures.hpp"
 #include "mods/mods.hpp"
 #include "utils/logger.hpp"

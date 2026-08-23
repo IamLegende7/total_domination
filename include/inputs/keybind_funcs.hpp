@@ -7,6 +7,7 @@ namespace TDKeybind {
     void tile_selection_left();
     void tile_selection_right();
     void reload();
+    void next_round();
 }
 
 #endif

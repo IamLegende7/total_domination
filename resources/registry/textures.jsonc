@@ -27,6 +27,10 @@
         "td:card_parts:seal_neutral": "$texture_dir$/cards/seal/neutral.png",
         "td:card_parts:seal_unit": "$texture_dir$/cards/seal/unit.png",
         "td:card_parts:seal_military_building": "$texture_dir$/cards/seal/military_building.png",
-        "td:card_parts:seal_economy_building": "$texture_dir$/cards/seal/economy_building.png"
+        "td:card_parts:seal_economy_building": "$texture_dir$/cards/seal/economy_building.png",
+        // Actors //
+        "td:industrial_lumberjack": "$texture_dir$/actors/buildings/industrial_lumberjack.jsonc",
+        // Resources //
+        "td:wood": "$texture_dir$/ui/resources/wood.png"
     }
 }

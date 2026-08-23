@@ -60,6 +60,8 @@ inline void init_locations_settings(const std::filesystem::path& config_file) {
     // Mods //
     LOCATIONS["mod_dir"] =              Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Mods", "mod_dir")));
     LOCATIONS["mod_server_path"] =      Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Mods", "mod_server_path")));
+    // Actors //
+    LOCATIONS["actor_dir"] =            Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Actors", "actor_dir")));
 }
 
 #endif

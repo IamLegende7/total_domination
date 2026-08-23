@@ -42,7 +42,7 @@ std::tuple<int, int> RenderAgent::set_dimensions(const int cols, const int rows,
     }
     map_width = (max_width+(16*(rows-1)))*2;
     map_height = (max_height+(11*(cols-1+rows-1)))*2;
-    agent_entitys.set_dimensions(x, y, map_width, map_height);
+    agent_entitys.set_dimensions(x, y-100, map_width, map_height); // TODO: handle heights changing the y value of entitys to under 0
     LOG(LogLevel::Debug, "Dimensions: x: %d, y: %d, map_width: %d, map_height: %d", x, y, map_width, map_height);
     return {map_width, map_height};
 };
@@ -166,7 +166,10 @@ bool RenderAgent::add_entity(const std::string& id, const std::string& sprite_id
     int depth = -1;
     if (movable)
         depth = 0;
-    return agent_entitys.insert(id, RenderAgentEntity(id, sprite_id, animation, x, y, width, height, entity_layer, rotation, hidden), depth, allow_subdivision);
+    bool status = agent_entitys.insert(id, RenderAgentEntity(id, sprite_id, animation, x, y, width, height, entity_layer, rotation, hidden), depth, allow_subdivision);
+    if (!status)
+        LOG(LogLevel::Warning, "Could not add new entity %s: X: %d, Y: %d, layer: %d, rotation: %d: quadtree did not accept entry", id.c_str(), x, y, entity_layer, rotation);
+    return status;
 };
 
 bool RenderAgent::trigger_subdivision() {
@@ -268,6 +271,7 @@ bool RenderAgent::render(const int zoom, const int x_offset, const int y_offset,
 
 void RenderAgent::render_target() {
     //LOG(LogLevel::Debug, "Starting Renderpass");
+    SDL_SetTextureScaleMode(target[CURRENT_ANIMATION_FRAME], SDL_SCALEMODE_NEAREST);
     SDL_SetRenderTarget(renderer, NULL);
     RenderState* current_state = &RENDER_STATES[CURRENT_RENDER_STATE];
     SDL_SetGPURenderState(renderer, current_state->state);
