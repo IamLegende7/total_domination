@@ -8,6 +8,9 @@ set(CMAKE_CXX_STANDARD 17)
 ### Source & Header files ###
 file(GLOB_RECURSE SOURCES "src/*.cpp")
 
+# Options
+option(ENABLE_PROFILING "Enable gprof profiling" OFF)
+
 
 ### Paths & Executable ###
 # Create the executable target
@@ -21,7 +24,19 @@ set(LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin/lib)
 
 ### Compile options ###
 # Set compile options
-target_compile_options(Total_Domination PRIVATE -Wall -Wextra -g -O0)
+target_compile_options(
+    Total_Domination PRIVATE
+        -Wall
+        -Wextra
+        -g
+        -O0
+        $<$<BOOL:${ENABLE_PROFILING}>:-pg>
+)
+
+target_link_options(
+    Total_Domination PRIVATE
+        $<$<BOOL:${ENABLE_PROFILING}>:-pg>
+)
 
 target_include_directories(Total_Domination PRIVATE 
     include 

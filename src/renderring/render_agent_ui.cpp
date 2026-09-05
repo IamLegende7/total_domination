@@ -5,7 +5,6 @@
 
 #include "utils/logger.hpp"
 #include "renderring/render_agent.hpp"
-#include "ui.hpp"
 
 TTF_Font* RenderAgent::get_font(const std::string& font_name, bool suppress_logs) {
     auto it = fonts.find(font_name);

@@ -49,14 +49,13 @@ inline void init_locations_settings(const std::filesystem::path& config_file) {
     LOCATIONS["texturepack_dir"] =      Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Textures", "texturepack_dir")));
     LOCATIONS["missing_texture"] =      Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Textures", "missing_texture")));
     LOCATIONS["missing_texture"] =      Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Textures", "missing_texture_tile")));
-    LOCATIONS["textures_json"] =        Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Textures", "textures_json")));
     // Logging //
     LOCATIONS["log_dir"] =              Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Logging", "log_dir")));
     LOCATIONS["log_file"] =             Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Logging", "log_file")));
     LOCATIONS["log_crash_dir"] =        Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Logging", "log_crash_dir")));
     // Registry //
-    LOCATIONS["units_json"] =           Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Registry", "units_json")));
-    LOCATIONS["tiles_json"] =           Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Registry", "tiles_json")));
+    LOCATIONS["textures_json"] =        Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Registry", "textures_json")));
+    LOCATIONS["actors_json"] =          Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Registry", "actors_json")));
     // Mods //
     LOCATIONS["mod_dir"] =              Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Mods", "mod_dir")));
     LOCATIONS["mod_server_path"] =      Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Mods", "mod_server_path")));

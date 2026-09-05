@@ -11,10 +11,10 @@
 #include "BS_thread_pool.hpp"
 #include <atomic>
 #include <filesystem>
+#include <cstdint>
 #include "rapidjson/document.h"
 
 #include "utils/json.hpp"
-#include "renderring/textures.hpp"
 #include "settings/locations.hpp"
 #include "settings/main.hpp"
 #include "settings/debug.hpp"
@@ -84,10 +84,11 @@ Map::Map(RenderAgent* agent, const std::filesystem::path& map_path) {
         return;
     }
 
-    add_texture(agent, "td:tile_missing");
-    add_texture(agent, "td:top_missing");
+    agent->add_texture("td:tile_missing", "td:tile_missing");
+    agent->add_texture("td:top_missing", "td:top_missing");
 
     // DECLARATIONS //
+    /* TODO: re-add
     if (map_json.HasMember("declarations")) {
         if (map_json["declarations"].HasMember("textures")) {
             for (const auto& declaration : map_json["declarations"]["textures"].GetObject()) {
@@ -97,11 +98,11 @@ Map::Map(RenderAgent* agent, const std::filesystem::path& map_path) {
                         declaration.value[constructor_index].HasMember("texture") ?
                             declaration.value[constructor_index]["texture"].GetString() :
                             "td:tile_missing",
-                        agent->texture_exists(declaration.value[constructor_index]["texture"].GetString()) ?
+                        (!agent->get_texture(declaration.value[constructor_index]["texture"].GetString())) ?
                             "td:none" :
                             (declaration.value[constructor_index].HasMember("texture") ?
-                                get_png_path(declaration.value[constructor_index]["texture"].GetString()) :
-                                get_png_path("td:tile_missing")),
+                                actor->get_png_path(declaration.value[constructor_index]["texture"].GetString()) :
+                                actor->get_png_path("td:tile_missing")),
                         declaration.value[constructor_index].HasMember("x") ?
                             declaration.value[constructor_index]["x"].GetInt() :
                             0,
@@ -117,6 +118,7 @@ Map::Map(RenderAgent* agent, const std::filesystem::path& map_path) {
             }
         }
     }
+    */
 
     // LOADING MAP DATA //
     // Allocate //
@@ -127,6 +129,7 @@ Map::Map(RenderAgent* agent, const std::filesystem::path& map_path) {
 
     // Load //
     std::set<std::string> tile_textures;
+    // TODO: Rework to give out one std::vector
     if (SETTINGS["multithreading"].get<bool>()) {
         for (size_t r = 0; r < rows; ++r) {
             cols = std::max(cols, (size_t)map_json["data"][r].Size());
@@ -188,15 +191,13 @@ Map::Map(RenderAgent* agent, const std::filesystem::path& map_path) {
 
     // Baking Atlas //
     tile_textures.insert("td:tile_missing");
-    std::string tile_texture_names[tile_textures.size()];
-    int tile_texture_index = 0;
-    for (auto texture = tile_textures.begin(); texture != tile_textures.end(); ++texture) {
-        tile_texture_names[tile_texture_index] = *texture;
-        tile_texture_index++;
+    std::vector<std::string> vector_tile_textures;
+    for (auto& texture : tile_textures) { // TODO: remove, make tile_textures be a std::vector by default
+        vector_tile_textures.push_back(texture);
     }
     const std::string atlas_tile_textures_name = "map:"+map_name+":atlas:tile_textures";
-    bake_atlas(agent, atlas_tile_textures_name, tile_texture_names, tile_textures.size());
-    agent->set_dimensions(cols, rows, -(16*(rows-1)), 0); // FIXME: tiles with a large height can be above y=0
+    agent->bake_atlas(atlas_tile_textures_name, vector_tile_textures);
+    agent->set_dimensions(-(16*(rows-1)), -100, 11*(cols+rows-1)*2, 16*rows*2); // FIXME: tiles with a large height can be above y=0
 
     // Add entitys //
     if (SETTINGS["multithreading"].get<bool>()) {
@@ -259,14 +260,14 @@ Map::Map(RenderAgent* agent, const std::filesystem::path& map_path) {
                 if (surrounding_height <= height_index+1) {
                     RenderAgentEntity& top_entity = entity_cache[r][c].back();
                     if (
-                        (top_entity.name == current_entity.name) ||
+                        ((top_entity.x == current_entity.x) && (top_entity.y == current_entity.y)) ||
                         (surrounding_height < height_index)
                     ) {
                         if (current_entity.layer == -1) {
                             agent->heighest_layer = agent->heighest_layer+1;
                             current_entity.layer = agent->heighest_layer;
                         }
-                        agent->agent_entitys.insert(current_entity.name, current_entity, -1, false);
+                        agent->insert_entity(current_entity, false);
                     }
                 } else {
                     //LOG(LogLevel::Debug, "Skipping tile \"%s\"", current_entity.name.c_str());
@@ -339,19 +340,12 @@ bool Map::load_row(const rapidjson::GenericValue<rapidjson::UTF8<>>& row_json, c
     return true;
 }
 
-RenderAgentEntity Map::make_tile_entity(const std::string& name, const std::string& sprite_id, const int& x, const int& y, const int& height_index) {
-    RenderAgentSprite* sprite = agent->get_sprite(sprite_id);
-    if (sprite == nullptr) {
-        LOG(LogLevel::Warning, "While making entity \"%s\": sprite \"%s\" does not exist.", name.c_str(), sprite_id.c_str());
-        sprite = agent->get_sprite("td:missing_tile");
-    }
-
-    int width = 32;
-    int height = 37;
-    std::string selected_animation = "default";
+RenderAgentEntity Map::make_tile_entity(const std::string& sprite_id, const int& x, const int& y, const int& height_index) {
+    uint8_t selected_animation = 0;
+    /* TODO: fix
     if (sprite != nullptr) {
-        width = sprite->max.w;
-        height = sprite->max.h;
+        width = sprite->animations[0].texture_rects[0].w;
+        height = sprite->animations[0].texture_rects[0].h;
         std::vector<std::string> keys;
         for (auto& [key, animation] : sprite->animations) {
             if (key.rfind("alt", 0) == 0) {
@@ -363,19 +357,24 @@ RenderAgentEntity Map::make_tile_entity(const std::string& name, const std::stri
             selected_animation = keys[random_index];
         }
     }
+    */
 
-    return RenderAgentEntity(
-        name,
-        sprite_id,
-        selected_animation,
-        (16*(x-y)),
-        (11*(y+x)-(16*height_index)),
-        width,
-        height,
-        -1,
-        0,
-        false
-    );
+    RenderAgentEntity entity;
+    entity.sprite = agent->get_sprite(sprite_id);
+    if (!entity.sprite) {
+        LOG(LogLevel::Warning, "Could not make entity at %d x %d: sprite \"%s\" does not exist.", x, y, sprite_id.c_str());
+        entity.sprite = agent->get_sprite("td:missing_tile");
+    }
+    entity.layer = agent->heighest_layer;
+
+    entity.x = (16*(x-y));
+    entity.y = (11*(y+x)-(16*height_index));
+    entity.animation = selected_animation;
+    entity.animation_frame = 0;
+    entity.rotation = 0;
+    entity.movable = false;
+
+    return entity;
 }
 
 bool Map::make_row_entitys(MapTile row[], size_t row_size, int row_index) {
@@ -385,7 +384,6 @@ bool Map::make_row_entitys(MapTile row[], size_t row_size, int row_index) {
         for (int height_index = 0; height_index < current_tile.height; ++height_index) {
             if ((current_tile.top_tile != "td:none") && (height_index == current_tile.height-1)) {
                 entity_cache[row_index][col_index].push_back(make_tile_entity(
-                    map_entity_name+":top_tile",
                     current_tile.top_tile,
                     current_tile.x,
                     current_tile.y,
@@ -393,7 +391,6 @@ bool Map::make_row_entitys(MapTile row[], size_t row_size, int row_index) {
                 ));
             } else {
                 entity_cache[row_index][col_index].push_back(make_tile_entity(
-                    map_entity_name+":base-"+std::to_string(height_index),
                     current_tile.base,
                     current_tile.x,
                     current_tile.y,
@@ -403,7 +400,6 @@ bool Map::make_row_entitys(MapTile row[], size_t row_size, int row_index) {
         }
         if ((current_tile.top_tile == "td:none") && (current_tile.top != "td:none")) {
             entity_cache[row_index][col_index].push_back(make_tile_entity(
-                map_entity_name+":top",
                 current_tile.top,
                 current_tile.x,
                 current_tile.y,

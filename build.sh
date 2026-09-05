@@ -12,8 +12,9 @@ show_warning=true
 compile_shaders=false
 download_submodules=false
 compile_for_windows=false
+compile_with_profiler=false
 
-OPTIONS=$(getopt -o c,p,d,h,s,w --long clean,auto-package,no-install-deps,cleanup,help,no-show-warning,offline-shaders,download,windows -- "$@")
+OPTIONS=$(getopt -o c,p,d,h,s,w --long clean,auto-package,no-install-deps,cleanup,help,no-show-warning,offline-shaders,download,windows,profiling -- "$@")
 eval set -- "$OPTIONS"
 while true; do
   case "$1" in
@@ -49,6 +50,10 @@ while true; do
       compile_for_windows=true
       shift
       ;;
+    --profiling)
+        compile_with_profiler=true
+        shift
+        ;;
     --)
       shift
       break
@@ -64,6 +69,7 @@ while true; do
       echo "[-s|--offline-shaders] Precompile shaders"
       echo "[--download]           Run lib/download.sh before building. Omit if you used 'git clone --recursive' or manually ran lib/download.sh."
       echo "[-w|--windows]         Cross-compile for windows."
+      echo "[--profiling]          Compile with profiling enabled (only on linux)."
       exit 1
       ;;
     *) 
@@ -126,7 +132,11 @@ mkdir -p build
 
 ## Build ##
 if [ "$compile_for_windows" = false ]; then
-    cmake -S . -B build
+    if [ "$compile_with_profiler" = true ]; then
+        cmake -S . -B build -DENABLE_PROFILING=ON
+    else
+        cmake -S . -B build
+    fi
     cmake --build build #--config Release
     rm -f bin/lib/*.a
 else 

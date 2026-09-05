@@ -5,7 +5,6 @@
 #include "map.hpp"
 
 #include "renderring/render_agent.hpp"
-#include "renderring/textures.hpp"
 
 #include "mods/mods.hpp"
 
@@ -19,8 +18,8 @@ ActorHandler::ActorHandler(RenderAgent* agent, RenderAgent* map_agent) {
     this->agent = agent;
     this->map_agent = map_agent;
     instances.set_capacity(16);
-    agent->agent_entitys.set_dimensions(map_agent->agent_entitys.x, map_agent->agent_entitys.y, map_agent->agent_entitys.width, map_agent->agent_entitys.height);
-    instances.set_dimensions(map_agent->agent_entitys.x, map_agent->agent_entitys.y, map_agent->agent_entitys.width, map_agent->agent_entitys.height);
+    agent->agent_quadtree.set_dimensions(map_agent->agent_quadtree.x, map_agent->agent_quadtree.y, map_agent->agent_quadtree.width, map_agent->agent_quadtree.height);
+    instances.set_dimensions(map_agent->agent_quadtree.x, map_agent->agent_quadtree.y, map_agent->agent_quadtree.width, map_agent->agent_quadtree.height);
 }
 
 ActorHandler::~ActorHandler() {};
@@ -50,8 +49,11 @@ bool ActorHandler::load_actor(const std::string& id) {
         LOG(LogLevel::Error, "Could not load actor \"%s\": json file \"%s\" has one or more incorrect types. Should be: [\"name\": str, \"type\": str, \"hp\": int, \"code\": Object]", id.c_str(), path.u8string().c_str());
         return false;
     }
-    std::string texture_names[] = {id};
-    bool atlas_status = bake_atlas(agent, id, texture_names, sizeof(texture_names)/sizeof(texture_names[0])); // TODO: change to add_to_atlas()
+    bool atlas_status;
+    if (!agent->get_texture("atlas:actors", true))
+        atlas_status = agent->bake_atlas("atlas:actors", std::vector<std::string>(1, id));
+    else
+        atlas_status = agent->add_to_atlas("atlas:actors", id);
     if (!atlas_status) {
         LOG(LogLevel::Error, "Failed to add texture \"%s\", to atlas \"%s\".", id.c_str(), id.c_str());
         return false;
@@ -152,25 +154,15 @@ bool ActorHandler::spawn_actor(const std::string& id, const int& col, const int&
         LOG(LogLevel::Warning, "Could not spawn instance of actor \"%s\" at %d %d: tile does not exist.", id.c_str(), col, row);
         return false;
     }
-    std::string map_entity_name = "map:tile:"+std::to_string(col)+"x"+std::to_string(row);
-    RenderAgentEntity* map_tile_entity = map_agent->get_entity(map_entity_name+":top", true);
-    if (map_tile_entity == nullptr) {
-        map_tile_entity = map_agent->get_entity(map_entity_name+":top_tile", true);
-        if (map_tile_entity == nullptr) {
-            map_tile_entity = map_agent->get_entity(map_entity_name+":base", true);
-            if (map_tile_entity == nullptr) {
-                LOG(LogLevel::Warning, "Could not spawn instance of actor \"%s\" at %d %d: tile entity does not exist.", id.c_str(), col, row);
-                return false;
-            }
-        }
-    }
+
     int x = (16*(col-row));
     int y = (11*(row+col)-(16*(tile->height-1)))-11;
-    agent->add_entity(entity_id, parent->sprite, "default", x, y, map_tile_entity->layer+2);
+    int layer = ((MAIN_MAP->cols-1)*row) + (col);
+    RenderAgentEntity* entity = agent->add_entity(parent->sprite, 0, x, y, layer);
     ActorInstance instance = {
         id,
         parent,
-        entity_id,
+        entity,
         parent->max_hp,
         parent->max_hp,
         parent->movement_speed,

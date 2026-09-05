@@ -18,9 +18,9 @@
 
 #include "main.hpp"
 #include "map.hpp"
+#include "registry.hpp"
 #include "inputs/inputs.hpp"
 #include "agents.hpp"
-#include "renderring/textures.hpp"
 #include "mods/mods.hpp"
 #include "utils/logger.hpp"
 
@@ -125,6 +125,11 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
     if (RENDER_SETTINGS["render_mode"].get<int>() == 2) {
         LOG(LogLevel::Warning, "Using software renderring");
     }
+
+    // Registry //
+    REGISTRY = new Registry();
+    REGISTRY->load("textures", LOCATIONS["textures_json"].get<std::filesystem::path>());
+    REGISTRY->load("actors", LOCATIONS["actors_json"].get<std::filesystem::path>());
 
     // Render Agents //
     LOG(LogLevel::Info, "Creating RenderAgents..");

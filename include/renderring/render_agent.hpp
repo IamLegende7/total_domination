@@ -2,177 +2,146 @@
 #define RENDER_AGENT_HPP
 
 #include <SDL3/SDL.h>
-#include <SDL3_image/SDL_image.h>
-#include <variant>
+#include <SDL3/SDL_pixels.h>
+#include <SDL3_ttf/SDL_ttf.h>
 #include <unordered_map>
+#include <vector>
 #include <string>
-#include <tuple>
-#include <memory>
 #include <filesystem>
+#include <cstdint>
+#include <deque>
 
-#include "ui.hpp"
-#include "renderring/shaders.hpp"
-
-#include "utils/logger.hpp"
-#include "utils/quadtree.hpp"
-
-#include "settings/render.hpp"
-#include "settings/locations.hpp"
-#include "settings/debug.hpp"
+inline constexpr int animation_frames_count = 12;
 
 struct RenderAgentTexture {
-    private:
-        SDL_Texture* texture;
-    public:
-        int width, height;
-
-        RenderAgentTexture()
-            : texture(static_cast<SDL_Texture*>(nullptr)), width(0), height(0) {};
-        RenderAgentTexture(SDL_Texture* texture, int width, int height)
-            : texture(texture), width(width), height(height) {};
-        void cleanup() {
-            SDL_DestroyTexture(texture);
-        };
-
-        SDL_Texture* get_texture() {
-            return texture;
-        };
+    SDL_Texture* texture = nullptr;
+    int size = -1; // If the texture is an atlas, this will be positive (see RenderAgent::_find_atlas_pos())
+    std::vector<int> rows_x;
+    std::vector<int> rows_h;
 };
 
 struct SpriteAnimation {
-    SDL_Rect texture_rects[12] = {{0, 0, 16, 16}};
+    std::vector<SDL_Rect> texture_rects = std::vector<SDL_Rect>(animation_frames_count, {0, 0, 16, 16});
 };
 
 struct RenderAgentSprite {
-    std::string texture;
-    std::unordered_map<std::string, SpriteAnimation> animations;
-    SDL_Rect max = {0, 0, 0, 0};
-
-    RenderAgentSprite()
-        : texture("atlas_interface"), animations({}) {}
-
-    RenderAgentSprite(std::string texture)
-        : texture(std::move(texture)), animations({}) {}
-    
-    RenderAgentSprite(std::string texture, const std::unordered_map<std::string, SpriteAnimation>& animations)
-        : texture(std::move(texture)) {
-        for (const auto& [key, animation] : animations) {
-            add_animation(key, animation);
-        }
-    }
-
-    RenderAgentSprite(const RenderAgentSprite& other) = default;
-    RenderAgentSprite& operator=(const RenderAgentSprite& other) = default;
-
-    SpriteAnimation* get_animation(const std::string& key, bool suppress_logs) {
-        auto it = animations.find(key);
-        if (it != animations.end())
-            return &it->second;
-        if (!suppress_logs)
-            LOG(LogLevel::Warning, "Requested non-existent animation \"%s\"", key.c_str());
-        return nullptr;
-    };
-
-    bool add_animation(const std::string& key, const SpriteAnimation animation) {
-        if (get_animation(key, true) != nullptr) {
-            LOG(LogLevel::Warning, "Could not add animation \"%s\": already exists.", key.c_str());
-            return false;
-        }
-        animations[key] = animation;
-        for (int i = 0; i < 12; ++i) {
-            max.x = std::max(max.x, animation.texture_rects[i].x);
-            max.y = std::max(max.y, animation.texture_rects[i].y);
-            max.w = std::max(max.w, animation.texture_rects[i].w);
-            max.h = std::max(max.h, animation.texture_rects[i].h);
-        }
-        return true;
-    };
+    std::string name;
+    RenderAgentTexture* texture = nullptr;
+    std::vector<SpriteAnimation> animations = std::vector<SpriteAnimation>(1, SpriteAnimation());
 };
 
 struct RenderAgentEntity {
-    std::string name;
-    std::string sprite;
-    std::string animation;
     int x, y;
-    int width, height;
     int layer;
-    int rotation;
-    bool hidden;
-
-    RenderAgentEntity()
-        : name("missing"), sprite("td:missing"), animation("default"), x(-100), y(-100), width(0), height(0), layer(-1), rotation(0), hidden(false) {};
-    RenderAgentEntity(std::string name, std::string sprite, std::string animation, int x, int y, int width, int height, int layer, int rotation=0, bool hidden=false)
-        : name(name), sprite(sprite), animation(animation), x(x), y(y), width(width), height(height), layer(layer), rotation(rotation), hidden(hidden) {};
+    RenderAgentSprite* sprite = nullptr;
+    uint8_t animation = 0;
+    uint8_t animation_frame = 0;
+    uint16_t rotation = 0;
+    bool movable = false;
 };
 
 struct TextureConstructor {
-    std::string name;
-    std::filesystem::path file;
+    std::string texture; // file path or texture id
     int x, y;
-    int size;
-    RenderAgentTexture* texture;
+};
 
-    TextureConstructor()
-        : name("td:missing"), file(LOCATIONS["missing_texture_tile"].get<std::filesystem::path>()), x(0), y(0), size(10) {};
-    TextureConstructor(std::string name, std::filesystem::path file, int x, int y, int size=1)
-        : name(name), file(file), x(x), y(y), size(size) {};
+struct Text {
+    std::string id;
+    TTF_Text* text;
+    int x = 0;
+    int y = 0;
+    SDL_Color colour = {255, 255, 255, 255};
+};
+
+class RenderAgentQuadtreeNode {
+    private:
+        std::vector<RenderAgentEntity*> contents;
+        RenderAgentQuadtreeNode* children[4] = {nullptr, nullptr, nullptr, nullptr};
+    
+    public:
+        int x, y;
+        int width, height;
+        int node_capacity = 16;
+        uint8_t depth = 0;
+
+        RenderAgentQuadtreeNode(): x(0), y(0), width(0), height(0), node_capacity(0), depth(0) {};
+        RenderAgentQuadtreeNode(const int x, const int y, const int width, const int height, const int node_capacity, const int depth=0): x(x), y(y), width(width), height(height), node_capacity(node_capacity), depth(depth) {};
+        ~RenderAgentQuadtreeNode() {};
+
+        void set_dimensions(int x, int y, int width, int height);
+        void set_capacity(const int node_capacity);
+
+        bool subdivide();
+        bool insert(RenderAgentEntity* entity, const bool allow_subdivision = true);
+        bool query(const int target_x, const int target_y, const int target_width, const int target_height, std::vector<RenderAgentEntity*>& result);
+        bool render(SDL_Renderer* renderer, const int x_offset, const int y_offset, const int zoom, const int resolution, const SDL_Color& colour={200, 30, 210, 255});
 };
 
 class RenderAgent {
     private:
+        SDL_Renderer* renderer;
+        SDL_Texture* target[animation_frames_count] = {nullptr};
+
         std::unordered_map<std::string, RenderAgentTexture> agent_textures;
         std::unordered_map<std::string, RenderAgentSprite> agent_sprites;
-
-        SDL_Renderer* renderer;
-
-        SDL_Texture* target[12] = {nullptr}; // Render to this texture first before writing that to the screen
-        
-        std::string* tex_cache_name;
-        SDL_Texture* tex_cache;
+        std::deque<RenderAgentEntity> agent_entitys;
 
         TTF_TextEngine* text_engine = nullptr;
         std::unordered_map<std::string, TTF_Font*> fonts;
         std::vector<Text> texts;
-        
+    
+        bool dirty[animation_frames_count] = {true};
     public:
-        QuadtreeNode<RenderAgentEntity> agent_entitys;
-        
+        RenderAgentQuadtreeNode agent_quadtree;
         int heighest_layer = -1;
 
-        bool dirty[12] = {true};
-        int map_width;
-        int map_height;
-        RenderAgent(SDL_Renderer* renderer, bool allow_text=false);
+        RenderAgent(SDL_Renderer* renderer, bool allow_text = false);
         ~RenderAgent();
-        std::tuple<int, int> set_dimensions(const int cols, const int rows, const int x=0, const int y=0);
+
+        RenderAgent(const RenderAgent&) = delete;
+        RenderAgent& operator=(const RenderAgent&) = delete;
+        RenderAgent(RenderAgent&&) = delete;
+        RenderAgent& operator=(RenderAgent&&) = delete;
+
+        void set_dimensions(const int& x, const int& y, const int& width, const int& height);
+        
         bool render(const int zoom=0, const int x_offset=0, const int y_offset=0, const bool clear_renderer=true, const int resolution=1, SDL_Color clear_colour={26, 26, 26, 255});
         void render_target();
-        void set_dirty(bool value=true);
+        void set_dirty(bool value = true);
 
         // Textures
-        bool add_texture(const std::string& id, const std::filesystem::path& texture_path);
-        RenderAgentTexture load_texture(const std::filesystem::path& texture_path);
+        SDL_Texture* load_texture(const std::string& texture); // registry key (= id) or path
         bool insert_texture(const std::string& id, RenderAgentTexture texture);
-        bool texture_exists(const std::string& id);
-        RenderAgentTexture* get_texture(const std::string& id, bool suppress_logs=false);
+        RenderAgentTexture* get_texture(const std::string& id, bool suppress_logs = false);
         void drop_texture(const std::string& id);
-        RenderAgentTexture bake_texture(TextureConstructor* texture_constructors[], const int array_size, const bool force_file_loading=false);
+        bool add_texture(const std::string& id, const std::string& texture_path);
+        SDL_Texture* bake_texture(std::vector<TextureConstructor*> constructors);
+        void list_textures(); // For debugging
+        bool check_texture_ptr(RenderAgentTexture* ptr); // For debugging
+        
+        // Atlas
+        std::filesystem::path get_png_path(const std::string& name);
+        bool find_atlas_pos(RenderAgentTexture* atlas, SDL_Texture* texture, TextureConstructor* constructor);
+        bool bake_atlas(const std::string& atlas_name, const std::vector<std::string> texture_names);
+        bool add_to_atlas(const std::string& atlas_name, const std::string& texture_name);
 
         // Sprites
-        bool add_sprite(const std::string& id, const std::string& texture_id, const std::unordered_map<std::string, SpriteAnimation>& animations);
-        bool add_sprite(const std::string& id, const std::string& texture_id, const int& x=0, const int& y=0, const int& width=-1, const int& height=-1);
-        RenderAgentSprite* get_sprite(const std::string& id, bool suppress_logs=false);
+        RenderAgentSprite* get_sprite(const std::string& id, bool suppress_logs = false);
+        bool add_sprite(const std::string& id, const std::string& texture_id, const int& x, const int& y, const int& w, const int& h, const std::filesystem::path& sprite_sheet_path);
+        void list_sprites(); // For debugging
+        bool check_sprite_ptr(RenderAgentSprite* ptr); // For debugging
 
-        // Entitys
-        bool add_entity(const std::string& id, const std::string& sprite_id, const std::string& animation, const int& x, const int& y, const int& layer=-1, const int& rotation=0, bool hidden=false, bool movable=false, bool allow_subdivision=true);
+        // Entity
+        RenderAgentEntity* add_entity(const std::string& sprite_id, const uint8_t& animation, const int& x, const int& y, const int& layer = -1, const int& rotation = 0, bool movable = false, bool allow_subdivision = true);
+        RenderAgentEntity* insert_entity(RenderAgentEntity& entity, bool allow_subdivision = true);
         bool trigger_subdivision();
-        RenderAgentEntity* get_entity(const std::string& id, bool suppress_logs=false);
+        RenderAgentEntity* get_entity(const int& x, const int& y, bool suppress_logs = false);
 
         // Text
-        TTF_Font* get_font(const std::string& font_name, bool suppress_logs=false);
-        Text* get_text(const std::string& id, bool suppress_logs=false);
+        TTF_Font* get_font(const std::string& font_name, bool suppress_logs = false);
+        Text* get_text(const std::string& id, bool suppress_logs = false);
         bool add_font(const std::string& font_name, const std::filesystem::path& font_path, const float font_size);
-        bool add_text(const std::string& id, const std::string& content, const std::string& font_name, const int x, const int y, const SDL_Color colour = {255, 255, 255, 255});
+        bool add_text(const std::string& id, const std::string& content, const std::string& font_name, const int x, const int y, const SDL_Color colour={255, 255, 255, 255});
 };
 
 #endif

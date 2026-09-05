@@ -1,11 +1,11 @@
 #ifndef QUADTREE_HPP
 #define QUADTREE_HPP
 
+#include <SDL3/SDL.h>
 #include <deque>
 #include <vector>
 #include <unordered_map>
 #include <string>
-#include <SDL3/SDL.h>
 #include <cmath>
 
 #include "utils/logger.hpp"

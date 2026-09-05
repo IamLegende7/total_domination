@@ -37,7 +37,7 @@ class Map {
         std::vector<RenderAgentEntity>** entity_cache;
         
         bool load_row(const rapidjson::GenericValue<rapidjson::UTF8<>>& row_json, const size_t row, std::set<std::string>& tile_textures);
-        RenderAgentEntity make_tile_entity(const std::string& name, const std::string& sprite_id, const int& x, const int& y, const int& height_index);
+        RenderAgentEntity make_tile_entity(const std::string& sprite_id, const int& x, const int& y, const int& height_index);
         bool make_row_entitys(MapTile row[], size_t row_size, int row_index);
     public:
         std::string map_name;

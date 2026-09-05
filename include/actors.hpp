@@ -32,7 +32,7 @@ struct Actor {
 struct ActorInstance {
     std::string id;
     Actor* parent;
-    std::string entity;
+    RenderAgentEntity* entity;
     int hp, max_hp;
     int movement_speed;
     int attack_value, defence_value;

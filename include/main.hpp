@@ -4,6 +4,7 @@
 #include <SDL3/SDL.h>
 #include <vector>
 #include "renderring/shaders.hpp"
+#include "renderring/render_agent.hpp"
 
 // Windows, Renderer & GPU devices //
 inline SDL_Window* WINDOW = nullptr;
@@ -39,6 +40,9 @@ inline Camera CAMERA = Camera(-100, -100, 1); // TODO: gentle camera movement //
 inline int UI_ZOOM = 4;
 inline int TILE_SELECTION_X = -1;
 inline int TILE_SELECTION_Y = -1;
+inline RenderAgentEntity* selected_tile_top = nullptr;
+inline RenderAgentEntity* selected_tile_left = nullptr;
+inline RenderAgentEntity* selected_tile_right = nullptr;
 
 // Players
 inline int CURRENT_PLAYER = 0;

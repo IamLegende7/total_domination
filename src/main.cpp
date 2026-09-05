@@ -16,7 +16,6 @@
 #include "player.hpp"
 #include "inputs/inputs.hpp"
 #include "agents.hpp"
-#include "renderring/textures.hpp"
 #include "renderring/shaders.hpp"
 #include "utils/logger.hpp"
 
@@ -131,27 +130,39 @@ SDL_AppResult SDL_AppIterate(void* appState) {
                     // Change to palace actor pos
                     TILE_SELECTION_X = 0;
                     TILE_SELECTION_Y = 0;
-                    std::string atlas_ui_textures[] = {
+                    std::vector<std::string> atlas_ui_textures = {
                         "td:selected_tile_top",
                         "td:selected_tile_left",
                         "td:selected_tile_right"
                     };
-                    bake_atlas(MAIN_RENDER_AGENT, "atlas:ui", atlas_ui_textures, sizeof(atlas_ui_textures)/sizeof(atlas_ui_textures[0]));
+                    MAIN_RENDER_AGENT->bake_atlas("atlas:ui", atlas_ui_textures);
                     MapTile* selected_tile = MAIN_MAP->get_tile(TILE_SELECTION_Y, TILE_SELECTION_X);
                     const int selected_tile_x = (16*(selected_tile->x-selected_tile->y));
                     const int selected_tile_y = (11*(selected_tile->x+selected_tile->y)-(16*(selected_tile->height-1)));
                     const auto [surrounding_height_top, surrounding_height_bottom, surrounding_height_left, surrounding_height_right] = MAIN_MAP->get_surrounding(TILE_SELECTION_Y, TILE_SELECTION_X);
                     const bool hide_left = (selected_tile->height <= surrounding_height_bottom);
                     const bool hide_right = (selected_tile->height <= surrounding_height_right);
-                    if (!MAIN_RENDER_AGENT->add_entity("selected_tile_top", "td:selected_tile_top", "default", selected_tile_x, selected_tile_y, -1, 0, false, true))
+                    selected_tile_top = MAIN_RENDER_AGENT->add_entity("td:selected_tile_top", 0, selected_tile_x, selected_tile_y, -1, 0, true, true);
+                    if (!selected_tile_top)
                         LOG(LogLevel::Error, "Could not add tile \"selected_tile_top\"");
-                    if (!MAIN_RENDER_AGENT->add_entity("selected_tile_left", "td:selected_tile_left", "default", selected_tile_x, selected_tile_y, -1, 0, hide_left, true))
+                    selected_tile_left = MAIN_RENDER_AGENT->add_entity("td:selected_tile_left", 0, selected_tile_x, selected_tile_y, -1, 0, true, true);
+                    if (!selected_tile_left)
                         LOG(LogLevel::Error, "Could not add tile \"selected_tile_left\"");
-                    if (!MAIN_RENDER_AGENT->add_entity("selected_tile_right", "td:selected_tile_right", "default", selected_tile_x, selected_tile_y, -1, 0, hide_right, true))
+                    selected_tile_right = MAIN_RENDER_AGENT->add_entity("td:selected_tile_right", 0, selected_tile_x, selected_tile_y, -1, 0, true, true);
+                    if (!selected_tile_right)
                         LOG(LogLevel::Error, "Could not add tile \"selected_tile_right\"");
-                    RenderAgentEntity* selected_tile_top = MAIN_RENDER_AGENT->get_entity("selected_tile_top");
+                    
+                    if ((selected_tile_left != nullptr) && hide_left) {
+                        selected_tile_left->x = -10000;
+                        selected_tile_left->y = -10000;
+                    }
+                    if ((selected_tile_right != nullptr) && hide_right) {
+                        selected_tile_right->x = -10000;
+                        selected_tile_right->y = -10000;
+                    }
+
                     if (selected_tile_top != nullptr) {
-                        SDL_Rect& selected_tile_top_rect = MAIN_RENDER_AGENT->get_sprite(selected_tile_top->sprite)->max;
+                        SDL_Rect& selected_tile_top_rect = selected_tile_top->sprite->animations[0].texture_rects[0];
                         CAMERA.x = (selected_tile_top->x+(int)(selected_tile_top_rect.w/2))-(int)((SCREEN_WIDTH/2)/CAMERA.zoom);
                         CAMERA.y = (selected_tile_top->y+(int)(selected_tile_top_rect.h/2))-(int)((SCREEN_HEIGHT/2)/CAMERA.zoom);
                     }
