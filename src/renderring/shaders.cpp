@@ -163,7 +163,6 @@ bool add_renderer_render_state(SDL_Renderer* renderer, const std::filesystem::pa
         return false;
     }
 
-    // TODO: Make automatic somehow
     CRTEffectUniforms uniforms;
     SDL_zero(uniforms);
     uniforms.texture_width = SCREEN_WIDTH;

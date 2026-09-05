@@ -3,6 +3,7 @@
 
 #include "actors.hpp"
 #include "map.hpp"
+#include "registry.hpp"
 
 #include "renderring/render_agent.hpp"
 
@@ -29,7 +30,11 @@ bool ActorHandler::load_actor(const std::string& id) {
         LOG(LogLevel::Warning, "Could not load actor \"%s\": actor already loaded", id.c_str());
         return false;
     }
-    std::filesystem::path path = replace_locations("$actor_dir$/buildings/industrial_lumberjack.jsonc"); // TODO: load from registry system
+    std::filesystem::path path = REGISTRY->get("actors", id, std::filesystem::path("none"));
+    if (path = std::filesystem::path("none")) {
+        LOG(LogLevel::Error, "Could not load actor \"%s\": id not found in registry", id.c_str());
+        return false;
+    }
     rapidjson::Document actor_json = open_json(path);
     if (
         !actor_json.HasMember("name") ||
