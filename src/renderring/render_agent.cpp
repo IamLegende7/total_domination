@@ -152,7 +152,47 @@ void RenderAgent::set_dirty(bool value) {
 
 
 
-SDL_Texture* RenderAgent::load_texture(const std::string& texture) {
+bool RenderAgent::replace_player_colours(SDL_Surface* surface, const SDL_Color& colour) {
+    LOG(LogLevel::Debug, "Player colour: r: %d g: %d b: %d a: %d", colour.r, colour.g, colour.b, colour.a);
+
+    for (int y = 0; y < surface->h; ++y) {
+        for (int x = 0; x < surface->w; ++x) {
+            Uint8 r, g, b, a;
+            SDL_ReadSurfacePixel(surface, x, y, &r, &g, &b, &a);
+            LOG(LogLevel::Debug, "Pixel %d x %d: r: %d g: %d b: %d a: %d", x, y, r, g, b, a);
+
+            if (r == b && g == 0 && a != 0) { // My encoding for player colours
+                LOG(LogLevel::Debug, "  --> replacing with r: %d g: %d b: %d", (int)std::round(r*(colour.r/255.0f)), (int)std::round(r*(colour.g/255.0f)), (int)std::round(r*(colour.b/255.0f)));
+                if (!SDL_WriteSurfacePixel(
+                    surface, x, y,
+                    (int)std::round(r*(colour.r/255.0f)),
+                    (int)std::round(r*(colour.g/255.0f)),
+                    (int)std::round(r*(colour.b/255.0f)),
+                    a
+                ))
+                    LOG(LogLevel::Warning, "Could not replace pixel at %d x %d: %s", x, y, SDL_GetError());
+
+                Uint8 testR, testG, testB, testA;
+
+                SDL_ReadSurfacePixel(
+                    surface,
+                    x,
+                    y,
+                    &testR,
+                    &testG,
+                    &testB,
+                    &testA
+                );
+
+                LOG(LogLevel::Debug, "After write: r: %d g: %d b: %d a: %d", testR, testG, testB, testA);
+            }
+        }
+    }
+
+    return true;
+}
+
+SDL_Texture* RenderAgent::load_texture(const std::string& texture, const SDL_Color& player_colour) {
     // Get path
     std::filesystem::path texture_path = get_png_path(texture);
     if (!std::filesystem::exists(texture_path))
@@ -163,7 +203,27 @@ SDL_Texture* RenderAgent::load_texture(const std::string& texture) {
     SDL_Surface* image_surface = IMG_Load(texture_path.u8string().c_str());
     if (!image_surface) {
         LOG(LogLevel::Warning, "Could not load Texture \"%s\": %s", texture_path.u8string().c_str(), SDL_GetError());
-        return nullptr;
+        SDL_DestroySurface(image_surface);
+    }
+
+    if (player_colour.a != 0) {
+        for (int y = 0; y < image_surface->h; ++y) {
+            for (int x = 0; x < image_surface->w; ++x) {
+                Uint8 r, g, b, a;
+                SDL_ReadSurfacePixel(image_surface, x, y, &r, &g, &b, &a);
+
+                if (r == b && g == 0 && a != 0) { // My encoding for player colours
+                    //LOG(LogLevel::Debug, "Pixel %d x %d: (r: %d g: %d b: %d a: %d) --> (r: %d g: %d b: %d a: 255)", x, y, r, g, b, a, (int)std::round(r*(player_colour.r/255.0f)), (int)std::round(r*(player_colour.g/255.0f)), (int)std::round(r*(player_colour.b/255.0f)));
+                    SDL_WriteSurfacePixel(
+                        image_surface, x, y,
+                        (int)std::round(r*(player_colour.r/255.0f)),
+                        (int)std::round(r*(player_colour.g/255.0f)),
+                        (int)std::round(r*(player_colour.b/255.0f)),
+                        255
+                    );
+                }
+            }
+        }
     }
 
     // To texture
@@ -171,12 +231,15 @@ SDL_Texture* RenderAgent::load_texture(const std::string& texture) {
         SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, image_surface);
         if (!texture) {
             LOG(LogLevel::Warning, "Could not create Texture from Surface: %s", SDL_GetError());
+            SDL_DestroySurface(image_surface);
+            return nullptr;
         }
         SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
         SDL_DestroySurface(image_surface);
         return texture;
     } else if (RENDER_SETTINGS["render_mode"].get<int>() == 2) {
         LOG(LogLevel::Error, "Render Mode \"2\" (Software Renderer) not supportet currently.");
+        SDL_DestroySurface(image_surface);
         return nullptr;
     }
 
@@ -213,7 +276,7 @@ bool RenderAgent::add_texture(const std::string& id, const std::string& texture_
     return true;
 }
 
-SDL_Texture* RenderAgent::bake_texture(std::vector<TextureConstructor*> constructors) {
+SDL_Texture* RenderAgent::bake_texture(std::vector<TextureConstructor*> constructors, const SDL_Color& player_colour) {
     int array_size = constructors.size();
     std::vector<SDL_Texture*> textures = std::vector<SDL_Texture*>(array_size, nullptr);
 
@@ -223,7 +286,7 @@ SDL_Texture* RenderAgent::bake_texture(std::vector<TextureConstructor*> construc
             continue;
         RenderAgentTexture* tmp_texture = get_texture(constructors[i]->texture, true);
         if (!tmp_texture) {
-            textures[i] = load_texture(constructors[i]->texture);
+            textures[i] = load_texture(constructors[i]->texture, player_colour);
             if (!textures[i])
                 LOG(LogLevel::Warning, "Could not load texture while baking; skipping.");
         } else {
@@ -362,7 +425,7 @@ bool RenderAgent::find_atlas_pos(RenderAgentTexture* atlas, SDL_Texture* texture
     return false;
 }
 
-bool RenderAgent::bake_atlas(const std::string& atlas_name, const std::vector<std::string> texture_names) {
+bool RenderAgent::bake_atlas(const std::string& atlas_name, const std::vector<std::string> texture_names, const SDL_Color& player_colour, uint8_t player_num) {
     LOG(LogLevel::Debug, "Baking Atlas \"%s\"..", atlas_name.c_str());
     const int array_size = texture_names.size();
     std::vector<SDL_Texture*> textures = std::vector<SDL_Texture*>((size_t)array_size, nullptr);
@@ -381,7 +444,7 @@ bool RenderAgent::bake_atlas(const std::string& atlas_name, const std::vector<st
     for (int i = 0; i < array_size; ++i) {
         RenderAgentTexture* tmp_texture = get_texture(texture_names[i], true);
         if (!tmp_texture) {
-            textures[i] = load_texture(texture_names[i]);
+            textures[i] = load_texture(texture_names[i], player_colour);
             if (!textures[i])
                 LOG(LogLevel::Warning, "Could not load texture while baking atlas; skipping.");
         } else {
@@ -400,11 +463,14 @@ bool RenderAgent::bake_atlas(const std::string& atlas_name, const std::vector<st
 
     // Making sprites
     for (int i = 0; i < array_size; ++i) {
-        add_sprite(texture_names[i], atlas_name, constructors[i]->x, constructors[i]->y, textures[i]->w, textures[i]->h, REGISTRY->get("textures", texture_names[i], std::filesystem::path("none")));
+        std::string sprite_id = texture_names[i];
+        if (player_colour.a != 0)
+            sprite_id = sprite_id + std::to_string(player_num);
+        add_sprite(sprite_id, atlas_name, constructors[i]->x, constructors[i]->y, textures[i]->w, textures[i]->h, REGISTRY->get("textures", texture_names[i], std::filesystem::path("none")));
     }
 
     // Baking
-    atlas->texture = bake_texture(constructors);
+    atlas->texture = bake_texture(constructors, player_colour);
     if (!atlas->texture)
         return false;
 
@@ -432,7 +498,7 @@ bool RenderAgent::bake_atlas(const std::string& atlas_name, const std::vector<st
     return true;
 }
 
-bool RenderAgent::add_to_atlas(const std::string& atlas_name, const std::string& texture_name) {
+bool RenderAgent::add_to_atlas(const std::string& atlas_name, const std::string& texture_name, const SDL_Color& player_colour, uint8_t player_num) {
     RenderAgentTexture* atlas = get_texture(atlas_name);
     if (!atlas)
         return false;
@@ -443,7 +509,7 @@ bool RenderAgent::add_to_atlas(const std::string& atlas_name, const std::string&
     SDL_Texture* texture = nullptr;
     RenderAgentTexture* tmp_texture = get_texture(texture_name, true);
     if (!texture) {
-        texture = load_texture(texture_name);
+        texture = load_texture(texture_name, player_colour);
         if (!texture) {
             LOG(LogLevel::Warning, "Could not load texture while baking atlas; abording.");
             SDL_DestroyTexture(texture);
@@ -456,9 +522,12 @@ bool RenderAgent::add_to_atlas(const std::string& atlas_name, const std::string&
     if (!texture)
         find_atlas_pos(atlas, texture, constructors[1]);
 
-    add_sprite(texture_name, atlas_name, constructors[1]->x, constructors[1]->y, texture->w, texture->h, REGISTRY->get("textures", texture_name, std::filesystem::path("none")));
+    std::string sprite_id = texture_name;
+    if (player_colour.a != 0)
+        sprite_id = sprite_id + std::to_string(player_num);
+    add_sprite(sprite_id, atlas_name, constructors[1]->x, constructors[1]->y, texture->w, texture->h, REGISTRY->get("textures", texture_name, std::filesystem::path("none")));
 
-    atlas->texture = bake_texture(constructors);
+    atlas->texture = bake_texture(constructors, player_colour);
     if (!atlas->texture)
         return false;
 

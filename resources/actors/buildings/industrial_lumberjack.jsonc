@@ -19,10 +19,6 @@
         "creation": [{
             "function": "td:remove_forest_tile",
             "arguments": ["$x$", "$y$"]
-        }],
-        "death": [{
-            "function": "td:delete_actor",
-            "arguments": ["$id$"]
         }]
     }
 }

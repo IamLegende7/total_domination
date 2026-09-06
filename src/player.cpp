@@ -5,11 +5,11 @@
 #include "actors.hpp"
 #include "utils/logger.hpp"
 
-Player::Player(const int& number, const std::string& name, const std::string& faction, const SDL_Color colour) {
+Player::Player(const int& number, const std::string& name, const std::string& faction, const SDL_Color& colour) {
     this->number = number;
     this->name = name;
     this->faction = faction;
-    actor_handler = new ActorHandler(ACTORS_RENDER_AGENT, MAIN_RENDER_AGENT);
+    actor_handler = new ActorHandler(ACTORS_RENDER_AGENT, MAIN_RENDER_AGENT, colour, number);
 }
 
 Player::~Player() {}

@@ -30,6 +30,7 @@
         "td:card_parts:seal_economy_building": "$texture_dir$/cards/seal/economy_building.png",
         // Actors //
         "td:industrial_lumberjack": "$texture_dir$/actors/buildings/industrial_lumberjack.jsonc",
+        "td:human_palace": "$texture_dir$/actors/buildings/human_palace.png",
         // Resources //
         "td:wood": "$texture_dir$/ui/resources/wood.png"
     }

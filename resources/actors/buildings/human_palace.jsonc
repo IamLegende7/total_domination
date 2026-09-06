@@ -1,0 +1,9 @@
+{
+    "name": "Palace",
+    "type": "td:special_building",
+    "hp": 500,
+    "movement_speed": 0,
+    "attack_value": 0,
+    "defence_value": 20,
+    "code": {}
+}

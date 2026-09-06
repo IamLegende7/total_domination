@@ -5,6 +5,7 @@
 #include <vector>
 #include <unordered_map>
 #include <deque>
+#include <cstdint>
 
 #include "rapidjson/document.h"
 #include "rapidjson/rapidjson.h"
@@ -46,8 +47,10 @@ class ActorHandler {
         RenderAgent* map_agent = nullptr;
         std::deque<Actor> actors;
         QuadtreeNode<ActorInstance> instances;
+        SDL_Color player_colour = player_colour;
+        uint8_t player_num = player_num;
     public:
-        ActorHandler(RenderAgent* agent, RenderAgent* map_agent);
+        ActorHandler(RenderAgent* agent, RenderAgent* map_agent, const SDL_Color& player_colour, uint8_t player_num);
         ~ActorHandler();
 
         // Actors

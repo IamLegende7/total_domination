@@ -15,12 +15,14 @@
 
 #include "settings/locations.hpp"
 
-ActorHandler::ActorHandler(RenderAgent* agent, RenderAgent* map_agent) {
+ActorHandler::ActorHandler(RenderAgent* agent, RenderAgent* map_agent, const SDL_Color& player_colour, uint8_t player_num) {
     this->agent = agent;
     this->map_agent = map_agent;
     instances.set_capacity(16);
     agent->agent_quadtree.set_dimensions(map_agent->agent_quadtree.x, map_agent->agent_quadtree.y, map_agent->agent_quadtree.width, map_agent->agent_quadtree.height);
     instances.set_dimensions(map_agent->agent_quadtree.x, map_agent->agent_quadtree.y, map_agent->agent_quadtree.width, map_agent->agent_quadtree.height);
+    this->player_colour = player_colour;
+    this->player_num = player_num;
 }
 
 ActorHandler::~ActorHandler() {};
@@ -56,9 +58,9 @@ bool ActorHandler::load_actor(const std::string& id) {
     }
     bool atlas_status;
     if (!agent->get_texture("atlas:actors", true))
-        atlas_status = agent->bake_atlas("atlas:actors", std::vector<std::string>(1, id));
+        atlas_status = agent->bake_atlas("atlas:actors", std::vector<std::string>(1, id), player_colour, player_num);
     else
-        atlas_status = agent->add_to_atlas("atlas:actors", id);
+        atlas_status = agent->add_to_atlas("atlas:actors", id, player_colour, player_num);
     if (!atlas_status) {
         LOG(LogLevel::Error, "Failed to add texture \"%s\", to atlas \"%s\".", id.c_str(), id.c_str());
         return false;
@@ -67,7 +69,7 @@ bool ActorHandler::load_actor(const std::string& id) {
         id,
         actor_json["name"].GetString(),
         actor_json["type"].GetString(),
-        id,
+        id+std::to_string(player_num),
         actor_json["hp"].GetInt()
     };
     if (actor_json.HasMember("movement_speed")) {

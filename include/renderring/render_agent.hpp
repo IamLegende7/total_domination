@@ -110,20 +110,21 @@ class RenderAgent {
         void set_dirty(bool value = true);
 
         // Textures
-        SDL_Texture* load_texture(const std::string& texture); // registry key (= id) or path
+        bool replace_player_colours(SDL_Surface* surface, const SDL_Color& colour);
+        SDL_Texture* load_texture(const std::string& texture, const SDL_Color& player_colour={0,0,0,0}); // registry key (= id) or path
         bool insert_texture(const std::string& id, RenderAgentTexture texture);
         RenderAgentTexture* get_texture(const std::string& id, bool suppress_logs = false);
         void drop_texture(const std::string& id);
         bool add_texture(const std::string& id, const std::string& texture_path);
-        SDL_Texture* bake_texture(std::vector<TextureConstructor*> constructors);
+        SDL_Texture* bake_texture(std::vector<TextureConstructor*> constructors, const SDL_Color& player_colour={0,0,0,0});
         void list_textures(); // For debugging
         bool check_texture_ptr(RenderAgentTexture* ptr); // For debugging
         
         // Atlas
         std::filesystem::path get_png_path(const std::string& name);
         bool find_atlas_pos(RenderAgentTexture* atlas, SDL_Texture* texture, TextureConstructor* constructor);
-        bool bake_atlas(const std::string& atlas_name, const std::vector<std::string> texture_names);
-        bool add_to_atlas(const std::string& atlas_name, const std::string& texture_name);
+        bool bake_atlas(const std::string& atlas_name, const std::vector<std::string> texture_names, const SDL_Color& player_colour={0,0,0,0}, uint8_t player_num=0);
+        bool add_to_atlas(const std::string& atlas_name, const std::string& texture_name, const SDL_Color& player_colour={0,0,0,0}, uint8_t player_num=0);
 
         // Sprites
         RenderAgentSprite* get_sprite(const std::string& id, bool suppress_logs = false);

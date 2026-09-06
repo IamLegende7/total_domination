@@ -168,9 +168,9 @@ SDL_AppResult SDL_AppIterate(void* appState) {
                     }
                 }
 
-                for (int i = 0; i < 2; ++i) {
-                    PLAYERS.push_back(Player(i, std::to_string(i), "td:human"));
-                }
+                PLAYERS.push_back(Player(0, "Developer", "td:human", {0, 255, 255, 255}));
+                PLAYERS.push_back(Player(1, "Computer "+std::to_string(1), "td:human", {255, 0, 0, 255}));
+
                 CURRENT_PLAYER = 0;
                 THIS_PLAYER = 0;
                 ROUND = 0;
