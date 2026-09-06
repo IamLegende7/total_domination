@@ -31,7 +31,7 @@ bool ActorHandler::load_actor(const std::string& id) {
         return false;
     }
     std::filesystem::path path = REGISTRY->get("actors", id, std::filesystem::path("none"));
-    if (path = std::filesystem::path("none")) {
+    if (path == std::filesystem::path("none")) {
         LOG(LogLevel::Error, "Could not load actor \"%s\": id not found in registry", id.c_str());
         return false;
     }

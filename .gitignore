@@ -18,7 +18,7 @@ data/logs/atlas-*.png
 core*
 **__pycache__
 gmon.out
-profiler_out.txt
+profiler_out.cpp
 
 # a 2000x2000 Map too large for github:
 resources/maps/testing/benchmark2.jsonc

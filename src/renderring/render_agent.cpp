@@ -319,15 +319,17 @@ bool RenderAgent::find_atlas_pos(RenderAgentTexture* atlas, SDL_Texture* texture
     std::vector<int>& rows_x = atlas->rows_x;
     std::vector<int>& rows_h = atlas->rows_h;
 
-    int y = 0;
+    int y;
     int iteration = 0;
     while (iteration <= 1000000) {
+        y = 0;
         // Rows height is diffrent from textures height
         for (std::size_t row = 0; row < rows_x.size(); ++row) {
             if ((texture->h == rows_h[row]) && (rows_x[row]+texture->w <= atlas->size)) {
                 constructor->x = rows_x[row];
                 constructor->y = y;
                 rows_x[row] += texture->w;
+                LOG(LogLevel::Debug, "Texture Constructor \"%s\" found simple pos at %d %d", constructor->texture.c_str(), constructor->x, constructor->y);
                 return true;
             }
             y += rows_h[row];
@@ -336,6 +338,7 @@ bool RenderAgent::find_atlas_pos(RenderAgentTexture* atlas, SDL_Texture* texture
         if (y+texture->h <= atlas->size) {
             constructor->x = 0;
             constructor->y = y;
+            LOG(LogLevel::Debug, "Texture Constructor \"%s\" found pos in new row at %d %d", constructor->texture.c_str(), constructor->x, constructor->y);
             rows_x.push_back(texture->w);
             rows_h.push_back(texture->h);
             return true;
@@ -351,6 +354,7 @@ bool RenderAgent::find_atlas_pos(RenderAgentTexture* atlas, SDL_Texture* texture
         if (required_size <= atlas->size)
             return false;
         atlas->size = required_size;
+        LOG(LogLevel::Debug, "Expanded atlas size to %d", atlas->size);
 
         iteration++;
     };
@@ -399,6 +403,11 @@ bool RenderAgent::bake_atlas(const std::string& atlas_name, const std::vector<st
         add_sprite(texture_names[i], atlas_name, constructors[i]->x, constructors[i]->y, textures[i]->w, textures[i]->h, REGISTRY->get("textures", texture_names[i], std::filesystem::path("none")));
     }
 
+    // Baking
+    atlas->texture = bake_texture(constructors);
+    if (!atlas->texture)
+        return false;
+
     // Saving
     if (DEBUG["save_texture_atlases"].get<bool>()) {
         if (RENDER_SETTINGS["render_mode"].get<int>() == 1) {
@@ -418,11 +427,6 @@ bool RenderAgent::bake_atlas(const std::string& atlas_name, const std::vector<st
         if (textures[i])
             SDL_DestroyTexture(textures[i]);
     }
-
-    // Baking
-    atlas->texture = bake_texture(constructors);
-    if (!atlas->texture)
-        return false;
 
     LOG(LogLevel::Debug, "Done!");
     return true;
@@ -454,6 +458,10 @@ bool RenderAgent::add_to_atlas(const std::string& atlas_name, const std::string&
 
     add_sprite(texture_name, atlas_name, constructors[1]->x, constructors[1]->y, texture->w, texture->h, REGISTRY->get("textures", texture_name, std::filesystem::path("none")));
 
+    atlas->texture = bake_texture(constructors);
+    if (!atlas->texture)
+        return false;
+
     // Saving
     if (DEBUG["save_texture_atlases"].get<bool>()) {
         if (RENDER_SETTINGS["render_mode"].get<int>() == 1) {
@@ -469,10 +477,6 @@ bool RenderAgent::add_to_atlas(const std::string& atlas_name, const std::string&
     }
 
     SDL_DestroyTexture(texture);
-
-    atlas->texture = bake_texture(constructors);
-    if (!atlas->texture)
-        return false;
 
     return true;
 }

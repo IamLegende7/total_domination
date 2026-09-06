@@ -84,9 +84,6 @@ Map::Map(RenderAgent* agent, const std::filesystem::path& map_path) {
         return;
     }
 
-    agent->add_texture("td:tile_missing", "td:tile_missing");
-    agent->add_texture("td:top_missing", "td:top_missing");
-
     // DECLARATIONS //
     /* TODO: re-add
     if (map_json.HasMember("declarations")) {
@@ -191,6 +188,7 @@ Map::Map(RenderAgent* agent, const std::filesystem::path& map_path) {
 
     // Baking Atlas //
     tile_textures.insert("td:tile_missing");
+    tile_textures.insert("td:top_missing");
     std::vector<std::string> vector_tile_textures;
     for (auto& texture : tile_textures) { // TODO: remove, make tile_textures be a std::vector by default
         vector_tile_textures.push_back(texture);
