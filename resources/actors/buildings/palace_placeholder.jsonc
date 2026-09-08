@@ -1,0 +1,14 @@
+{
+    "name": "Palace",
+    "type": "td:special_building",
+    "hp": 1,
+    "movement_speed": 0,
+    "attack_value": 0,
+    "defence_value": 0,
+    "code": {
+        "spawn": [{
+            "function": "td:spawn_palace",
+            "arguments": []
+        }]
+    }
+}

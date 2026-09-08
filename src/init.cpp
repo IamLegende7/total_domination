@@ -128,8 +128,6 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
 
     // Registry //
     REGISTRY = new Registry();
-    REGISTRY->load("textures", LOCATIONS["textures_json"].get<std::filesystem::path>());
-    REGISTRY->load("actors", LOCATIONS["actors_json"].get<std::filesystem::path>());
 
     // Render Agents //
     LOG(LogLevel::Info, "Creating RenderAgents..");

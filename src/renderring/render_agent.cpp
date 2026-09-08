@@ -444,7 +444,7 @@ bool RenderAgent::bake_atlas(const std::string& atlas_name, const std::vector<st
     for (int i = 0; i < array_size; ++i) {
         RenderAgentTexture* tmp_texture = get_texture(texture_names[i], true);
         if (!tmp_texture) {
-            textures[i] = load_texture(texture_names[i], player_colour);
+            textures[i] = load_texture(texture_names[i]);
             if (!textures[i])
                 LOG(LogLevel::Warning, "Could not load texture while baking atlas; skipping.");
         } else {
@@ -509,7 +509,7 @@ bool RenderAgent::add_to_atlas(const std::string& atlas_name, const std::string&
     SDL_Texture* texture = nullptr;
     RenderAgentTexture* tmp_texture = get_texture(texture_name, true);
     if (!texture) {
-        texture = load_texture(texture_name, player_colour);
+        texture = load_texture(texture_name);
         if (!texture) {
             LOG(LogLevel::Warning, "Could not load texture while baking atlas; abording.");
             SDL_DestroyTexture(texture);

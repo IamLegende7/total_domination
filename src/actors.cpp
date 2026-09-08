@@ -167,7 +167,7 @@ bool ActorHandler::spawn_actor(const std::string& id, const int& col, const int&
     int layer = ((MAIN_MAP->cols-1)*row) + (col);
     RenderAgentEntity* entity = agent->add_entity(parent->sprite, 0, x, y, layer);
     ActorInstance instance = {
-        id,
+        entity_id,
         parent,
         entity,
         parent->max_hp,
@@ -185,6 +185,25 @@ bool ActorHandler::spawn_actor(const std::string& id, const int& col, const int&
     //LOG(LogLevel::Debug, "Spawned instance of \"%s\" at %d %d. Length is now: %d", id.c_str(), col, row, all_instances.size());
     agent->set_dirty();
     return true;
+}
+
+bool ActorHandler::delete_instance(const std::string& id) {
+    std::vector<ActorInstance*> actors;
+    instances.query_by_id(id, actors);
+    instances.delete_entries(actors);
+    return true;
+}
+
+ActorInstance* ActorHandler::get_instance(const std::string& id, bool suppress_logs) {
+    std::vector<ActorInstance*> result;
+    instances.query_by_id(id, result);
+    if (result.size() > 0) {
+        return result[0];
+    }
+
+    if (!suppress_logs)
+        LOG(LogLevel::Warning, "Requested non-existent instance with id \"%s\"", id);
+    return nullptr;
 }
 
 ActorInstance* ActorHandler::get_instance(const int& col, const int& row, bool suppress_logs) {

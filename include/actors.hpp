@@ -60,6 +60,8 @@ class ActorHandler {
         // ActorInstances
         int get_instance_count(const std::string& id);
         bool spawn_actor(const std::string& id, const int& col, const int& row);
+        bool delete_instance(const std::string& id);
+        ActorInstance* get_instance(const std::string& id, bool suppress_logs=false);
         ActorInstance* get_instance(const int& col, const int& row, bool suppress_logs=false);
 
         // Actor functions

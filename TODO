@@ -1,19 +1,18 @@
-TODO: cache text in a SDL_Texture
 TODO: Add software renderring
-TODO: mouse inputs
-TODO: gamepad inputs
-TODO: touch inputs
-TODO: quick switching between input modes
-TODO: Main menu
-TODO: Settings menu
-TODO: Map selection/matchmaking menu
+More inputs:
+    TODO: mouse inputs
+    TODO: gamepad inputs
+    TODO: touch inputs
+    TODO: quick switching between input modes
+Menus:
+    TODO: cache text in a SDL_Texture
+    TODO: Main menu
+    TODO: Settings menu
+    TODO: Map selection/matchmaking menu
 TODO: .lang files for translation
 TODO: own SDL_Scancode <-> string mapping (SDL3s is inconsistand across platforms)
 TODO: translate build.sh to CMake
-FIXME: CRT shader on windows just shows black window
 TODO: process isolation for the ModServer
-TODO: add better registry system and mods adding custom entrys on load
-TODO: add to texture atlas function
-TODO: merge renderring/textures.cpp into RenderAgent
-TODO: texture atlas for actors
+TODO: logger log level setting
 FIXME: needed textures stored in set is shared between the threads loading the rows; this causes occasional crashes
+FIXME: CRT shader on windows just shows black window

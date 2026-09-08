@@ -16,9 +16,9 @@
                 "arguments": ["td:wood"]
             }
         ],
-        "creation": [{
+        "spawn": [{
             "function": "td:remove_forest_tile",
-            "arguments": ["$x$", "$y$"]
+            "arguments": []
         }]
     }
 }

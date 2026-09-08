@@ -2,11 +2,13 @@
 #define QUADTREE_HPP
 
 #include <SDL3/SDL.h>
-#include <deque>
+#include <list>
 #include <vector>
 #include <unordered_map>
 #include <string>
 #include <cmath>
+#include <algorithm>
+#include <memory>
 
 #include "utils/logger.hpp"
 
@@ -21,7 +23,7 @@ template<typename T>
 class QuadtreeNode {
     private:
         std::unordered_map<std::string, QuadtreeEntry<T>> contents;
-        std::deque<T> contents_storage;
+        std::list<T> contents_storage;
         QuadtreeNode* children[4] = {nullptr, nullptr, nullptr, nullptr};
 
         bool subdivide() {
@@ -235,6 +237,37 @@ class QuadtreeNode {
             }
             return true;
         };
+
+        bool delete_entries(const std::vector<T*>& entries) {
+            for (T* entry : entries) {
+                if (entry == nullptr)
+                    continue;
+
+                for (auto it = contents.begin(); it != contents.end();) {
+                    if (it->second.content == entry) {
+                        it = contents.erase(it);
+                    } else {
+                        ++it;
+                    }
+                }
+
+                for (auto it = contents_storage.begin();
+                    it != contents_storage.end();
+                    ++it) {
+                    if (std::addressof(*it) == entry) {
+                        contents_storage.erase(it);
+                        break;
+                    }
+                }
+            }
+
+            if (children[0] != nullptr) {
+                for (int i = 0; i < 4; ++i) {
+                    children[i]->delete_entries(entries);
+                }
+            }
+            return true;
+        }
 
         bool render(SDL_Renderer* renderer, const int x_offset, const int y_offset, const int zoom, const int resolution, const SDL_Color& colour={200, 30, 210, 255}) { // TODO: don't render outside of view
             SDL_FRect rect = {

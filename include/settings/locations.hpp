@@ -53,9 +53,6 @@ inline void init_locations_settings(const std::filesystem::path& config_file) {
     LOCATIONS["log_dir"] =              Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Logging", "log_dir")));
     LOCATIONS["log_file"] =             Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Logging", "log_file")));
     LOCATIONS["log_crash_dir"] =        Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Logging", "log_crash_dir")));
-    // Registry //
-    LOCATIONS["textures_json"] =        Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Registry", "textures_json")));
-    LOCATIONS["actors_json"] =          Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Registry", "actors_json")));
     // Mods //
     LOCATIONS["mod_dir"] =              Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Mods", "mod_dir")));
     LOCATIONS["mod_server_path"] =      Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Mods", "mod_server_path")));

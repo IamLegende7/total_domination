@@ -23,7 +23,8 @@ bool Registry::add(const std::string& category, const std::string& key, const st
 }
 
 bool Registry::load(const std::string& category, const std::filesystem::path& registry_file) {
-    rapidjson::Document registry_json = open_json(registry_file);
+    rapidjson::Document registry_json = open_json(replace_locations(registry_file));
+
     if (!registry_json.IsObject()) {
         LOG(LogLevel::Warning, "\"%s\" is not a valid registry.json file: root is not an object!", registry_file.u8string().c_str());
         return false;
