@@ -238,7 +238,17 @@ bool ActorHandler::round() {
                         mod = function.function.substr(0, sep);
                         func = function.function.substr(sep+1);
                     }
-                    ModServerResponse response = MOD_SERVER->execute(mod, func, function.arguments);
+                    rapidjson::Document arguments(rapidjson::kArrayType);
+                    rapidjson::Document::AllocatorType& allocator = arguments.GetAllocator();
+                    rapidjson::Value arg0;
+                    arg0.SetString(instance->id.c_str(), allocator);
+                    arguments.PushBack(arg0, allocator);
+                    for (rapidjson::SizeType i = 0; i < function.arguments.Size(); i++) {
+                        rapidjson::Value arg;
+                        arg.CopyFrom(function.arguments[i], allocator);
+                        arguments.PushBack(arg, allocator);
+                    }
+                    ModServerResponse response = MOD_SERVER->execute(mod, func, arguments);
                     if (response.status != 0) {
                         LOG(LogLevel::Warning, "Could not execute \"%s\": Code: %d: \"%s\"", function.function.c_str(), response.status, response.message.c_str());
                     }

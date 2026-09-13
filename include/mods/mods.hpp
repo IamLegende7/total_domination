@@ -37,6 +37,7 @@ namespace ModServerFunctions {
     inline std::unordered_map<std::string, std::function<void(rapidjson::Value&,rapidjson::Document&)>> functions = {
         {"LOG", ModServerFunctions::log},
         {"get_resource", ModServerFunctions::get_resource},
+        {"set_resource", ModServerFunctions::set_resource},
         {"get_pos", ModServerFunctions::get_pos},
         {"get_owner", ModServerFunctions::get_owner},
         {"get_faction", ModServerFunctions::get_faction},

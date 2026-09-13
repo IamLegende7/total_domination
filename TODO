@@ -14,5 +14,6 @@ TODO: own SDL_Scancode <-> string mapping (SDL3s is inconsistand across platform
 TODO: translate build.sh to CMake
 TODO: process isolation for the ModServer
 TODO: logger log level setting
+TODO: allow integers in actors functions arguments
 FIXME: needed textures stored in set is shared between the threads loading the rows; this causes occasional crashes
 FIXME: CRT shader on windows just shows black window

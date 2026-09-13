@@ -23,20 +23,10 @@ bool Registry::add(const std::string& category, const std::string& key, const st
 }
 
 bool Registry::load(const std::string& category, const std::filesystem::path& registry_file) {
-    rapidjson::Document registry_json = open_json(replace_locations(registry_file));
+    rapidjson::Document data = open_json(replace_locations(registry_file));
 
-    if (!registry_json.IsObject()) {
-        LOG(LogLevel::Warning, "\"%s\" is not a valid registry.json file: root is not an object!", registry_file.u8string().c_str());
-        return false;
-    }
-    if (!registry_json.HasMember("data")) {
-        LOG(LogLevel::Warning, "\"%s\" is not a valid registry.json file: it does not contain value \"data\"", registry_file.u8string().c_str());
-        return false;
-    }
-
-    const rapidjson::Value& data = registry_json["data"];
     if (!data.IsObject()) {
-        LOG(LogLevel::Warning, "\"%s\" is not a valid registry.json file: \"data\" is not an object", registry_file.u8string().c_str());
+        LOG(LogLevel::Warning, "\"%s\" is not a valid registry.json file: root is not an object!", registry_file.u8string().c_str());
         return false;
     }
 
@@ -64,4 +54,18 @@ std::filesystem::path Registry::get(const std::string& category, const std::stri
     if (!suppress_logs)
         LOG(LogLevel::Warning, "Requested non-existent registered value \"%s\" in \"%s\"", key.c_str(), category.c_str());
     return default_value;
+}
+
+std::unordered_map<std::string, std::filesystem::path>& Registry::get_category(const std::string& category, bool suppress_logs) {
+    for (auto& [key, map] : values) {
+        if (key == category) {
+            return map;
+        }
+    }
+
+    if (!suppress_logs)
+        LOG(LogLevel::Warning, "Requested non-existent registery category \"%s\"", category.c_str());
+    static std::unordered_map<std::string, std::filesystem::path> empty_map;
+    empty_map.clear();
+    return empty_map;
 }

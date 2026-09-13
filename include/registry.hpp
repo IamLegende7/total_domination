@@ -16,6 +16,7 @@ class Registry {
         bool load(const std::string& category, const std::filesystem::path& registry_file);
 
         std::filesystem::path get(const std::string& category, const std::string& key, const std::filesystem::path& default_value, bool suppress_logs=false);
+        std::unordered_map<std::string, std::filesystem::path>& get_category(const std::string& category, bool suppress_logs=false);
 };
 
 inline Registry* REGISTRY = nullptr;
