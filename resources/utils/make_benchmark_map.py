@@ -1,5 +1,8 @@
 import json
 import sys
+import math
+
+CHUNK_SIZE = 16
 
 if len(sys.argv) in [3, 4]:
     try:
@@ -21,18 +24,36 @@ else:
 #height = 4
 
 contents = {
-    "name": "Map loading benchmark",
+    "name": f"Map loading benchmark ({size}x{size} Tiles)",
     "description": "A super big map for benchmarking map loading. Made with resources/utils/make_benchmark_map.py",
     "declarations": {},
     "data": []
 }
 
-row = []
-for i in range(size):
-    row.append({"base": "td:dirt", "top": "td:top_grass", "height": height})
+for chunk_y in range(0, size, CHUNK_SIZE):
+    chunk_row = []
 
-for i in range(size):
-    contents["data"].append(row)
+    for chunk_x in range(0, size, CHUNK_SIZE):
+        chunk = []
+
+        chunk_height = min(CHUNK_SIZE, size - chunk_y)
+        chunk_width = min(CHUNK_SIZE, size - chunk_x)
+
+        for tile_y in range(chunk_height):
+            tile_row = []
+
+            for tile_x in range(chunk_width):
+                tile_row.append({
+                    "base": "td:dirt",
+                    "top": "td:top_grass",
+                    "height": height,
+                })
+
+            chunk.append(tile_row)
+
+        chunk_row.append(chunk)
+
+    contents["data"].append(chunk_row)
 
 with open(output_file, "w") as file:
     file.write(json.dumps(contents, indent=4))

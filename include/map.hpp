@@ -6,48 +6,65 @@
 #include <set>
 #include <tuple>
 #include <filesystem>
-#include "rapidjson/document.h"
 #include "rapidjson/rapidjson.h"
 
 #include "renderring/render_agent.hpp"
 
-struct TileResources {
+#include "actors.hpp"
 
+inline constexpr int chunk_size = 16;
+
+// TODO: tile effects
+struct MapTileEffect {
+    std::string id;
+};
+
+struct MapTileEffectInstance {
+    MapTileEffect* parent;
 };
 
 struct MapTile {
     std::string base;
-    std::string top_tile;
     std::string top;
     int height;
     int x, y;
-    int size;
-    TileResources resources;
+    RenderAgentEntity* top_entity;
+    std::vector<RenderAgentEntity*> base_entities;
+    std::vector<ActorInstance*> actors;
+    std::vector<MapTileEffectInstance> effects;
+};
 
-    MapTile():
-        base("td:missing"), top_tile("td:none"), top("td:none"), height(1), x(-100), y(-100), size(1) {};
-    MapTile(const std::string& base, int x, int y):
-        base(base), top_tile("td:none"), top("td:none"), height(1), x(x), y(y), size(1) {};
+struct ActorConstructor {
+    std::string id;
+    int owner;
+    int col, row;
+};
+
+struct MapChunk {
+    MapTile data[chunk_size][chunk_size];
 };
 
 class Map {
     private:
         RenderAgent* agent;
-        MapTile** map_data;
-        std::vector<RenderAgentEntity>** entity_cache;
-        
-        bool load_row(const rapidjson::GenericValue<rapidjson::UTF8<>>& row_json, const size_t row, std::set<std::string>& tile_textures);
-        RenderAgentEntity make_tile_entity(const std::string& sprite_id, const int& x, const int& y, const int& height_index);
-        bool make_row_entitys(MapTile row[], size_t row_size, int row_index);
+        std::vector<std::vector<MapChunk>> map_data;
+
+        bool load_chunk_data(rapidjson::Value& chunk_json, const size_t& chunk_x, const size_t& chunk_y, std::set<std::string>& tile_textures, std::vector<ActorConstructor>& actor_constructors);
+        bool load_chunk_entities(const int& chunk_x, const int& chunk_y, std::vector<std::tuple<int, int, RenderAgentEntity>>& entities);
+
     public:
-        std::string map_name;
-        std::filesystem::path map_path;
-        std::string map_description;
+        std::string name;
+        std::filesystem::path path;
+        std::string description;
         size_t rows;
         size_t cols;
+        std::string atlas_name;
 
-        std::tuple<int, int, int, int> get_surrounding(const int row, const int col);
-        MapTile* get_tile(const int row, const int col, const bool suppress_logs=false);
+        std::tuple<int, int, int, int> get_surrounding(const int& col, const int& row);
+        MapChunk* get_chunk(const int& chunk_x, const int& chunk_y, const bool& suppress_logs=false);
+        MapTile* get_tile(const int& col, const int& row, const bool& suppress_logs=false);
+
+        bool load_chunks(const std::vector<std::tuple<int, int>>& chunk_positions);
 
         // INIT & CLEANUP //
         Map(RenderAgent* agent, const std::filesystem::path& map_path);

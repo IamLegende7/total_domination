@@ -1,9 +1,8 @@
 {
     // INTERNAL //
-    "td:selected_tile_top": "$texture_dir$/ui/selected_tile/top.png",
-    "td:selected_tile_left": "$texture_dir$/ui/selected_tile/left.png",
-    "td:selected_tile_right": "$texture_dir$/ui/selected_tile/right.png",
+    "td:selected_tile": "$texture_dir$/ui/selected_tile.json",
     "td:test": "$texture_dir$/test.png",
+    "td:missing": "$texture_dir$/missing.png",
     // Tiles //
     "td:tile_missing": "$texture_dir$/tiles/missing.png",
     "td:dirt": "$texture_dir$/tiles/dirt.png",
@@ -27,6 +26,7 @@
     "td:card_parts:seal_economy_building": "$texture_dir$/cards/seal/economy_building.png",
     // Actors //
     "td:industrial_lumberjack": "$texture_dir$/actors/buildings/industrial_lumberjack.jsonc",
+    "td:palace_placeholder": "$texture_dir$/missing.png",
     "td:human_palace": "$texture_dir$/actors/buildings/human_palace.png",
     // Resources //
     "td:wood": "$texture_dir$/ui/resources/wood.png"

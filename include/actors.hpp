@@ -12,11 +12,26 @@
 
 #include "renderring/render_agent.hpp"
 
-#include "utils/quadtree.hpp"
-
-struct ActorFunction{
+struct ActorFunction {
     std::string function;
     rapidjson::Document arguments = rapidjson::Document(rapidjson::kArrayType);
+
+    ActorFunction() = default;
+    ActorFunction(const ActorFunction& other) {
+        function = other.function;
+        arguments.CopyFrom(other.arguments, arguments.GetAllocator());
+    }
+
+    ActorFunction& operator=(const ActorFunction& other) {
+        if (this != &other) {
+            function = other.function;
+            arguments.CopyFrom(other.arguments, arguments.GetAllocator());
+        }
+        return *this;
+    }
+
+    ActorFunction(ActorFunction&&) noexcept = default;
+    ActorFunction& operator=(ActorFunction&&) noexcept = default;
 };
 
 struct Actor {
@@ -38,19 +53,19 @@ struct ActorInstance {
     int movement_speed;
     int attack_value, defence_value;
     int x, y;
-    int width = 1, height = 1; // keep Quadtree happy
 };
 
 class ActorHandler {
     private:
         RenderAgent* agent = nullptr;
-        RenderAgent* map_agent = nullptr;
         std::deque<Actor> actors;
-        QuadtreeNode<ActorInstance> instances;
+        std::deque<ActorInstance> instances;
         SDL_Color player_colour = player_colour;
         uint8_t player_num = player_num;
+
+        bool execute_actor_function(ActorInstance* instance, const std::string& key);
     public:
-        ActorHandler(RenderAgent* agent, RenderAgent* map_agent, const SDL_Color& player_colour, uint8_t player_num);
+        ActorHandler(RenderAgent* agent, const SDL_Color& player_colour, uint8_t player_num);
         ~ActorHandler();
 
         // Actors
@@ -59,10 +74,10 @@ class ActorHandler {
 
         // ActorInstances
         int get_instance_count(const std::string& id);
-        bool spawn_actor(const std::string& id, const int& col, const int& row);
+        ActorInstance* spawn_actor(const std::string& id, const int& col, const int& row);
         bool delete_instance(const std::string& id);
         ActorInstance* get_instance(const std::string& id, bool suppress_logs=false);
-        ActorInstance* get_instance(const int& col, const int& row, bool suppress_logs=false);
+        int get_instance_index(const std::string& id, bool suppress_logs=true);
 
         // Actor functions
         bool round();

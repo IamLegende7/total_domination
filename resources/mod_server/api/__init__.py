@@ -12,3 +12,6 @@ from api.td_main import (
     registry_load,
     registry_get
 )
+import api.communication
+import api.internal
+import api.mod_handling

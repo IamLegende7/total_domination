@@ -9,16 +9,21 @@
 #include <functional>
 #include <filesystem>
 
-struct ModServerResponse {
-    int status;
-    std::string message;
-    std::string sender;
-    rapidjson::Value data = rapidjson::Value();
+enum class ModServerRequestType {
+    execute,
+    load_mod,
+    status,
+    response,
+    error
 };
 
 struct ModServerRequest {
-    std::string type;
+    std::string uuid;
+    ModServerRequestType type;
+    bool origin = false; // True = TDModServer, False = TD
     rapidjson::Document data = rapidjson::Document();
+
+    int get_status();
 };
 
 namespace ModServerFunctions {
@@ -54,19 +59,25 @@ class ModServer {
         SDL_Process* process;
         SDL_IOStream* output;
         SDL_IOStream* input;
+
+        std::string type_to_string(ModServerRequestType& type);
+        ModServerRequestType string_to_type(std::string string);
     public:
         ModServer();
         ~ModServer();
 
+        // Tools //
+        std::string uuid4();
+        
         // Calls //
-        void make_request(ModServerRequest& request);
-        void handle_function_request(ModServerResponse& function_request);
-        ModServerResponse get_response();
+        void send_request(ModServerRequest& request);
+        void handle_function_request(ModServerRequest& function_request);
+        ModServerRequest get_response();
 
         // API //
-        ModServerResponse status();
-        ModServerResponse execute(const std::string& mod, const std::string& function, rapidjson::Document& args);
-        ModServerResponse load_mod(const std::filesystem::path& path);
+        ModServerRequest status();
+        ModServerRequest execute(const std::string& function, rapidjson::Document& args);
+        ModServerRequest load_mod(const std::filesystem::path& path);
 };
 
 inline ModServer* MOD_SERVER = nullptr;

@@ -1,431 +1,464 @@
-#include "map.hpp"
-
-#include <SDL3/SDL.h>
 #include <SDL3/SDL_stdinc.h>
+#include <SDL3/SDL_timer.h>
 
-#include <set>
 #include <string>
 #include <vector>
+#include <set>
 #include <tuple>
-#include <SDL3/SDL_timer.h>
+#include <filesystem>
+#include "rapidjson/rapidjson.h"
 #include "BS_thread_pool.hpp"
 #include <atomic>
-#include <filesystem>
-#include <cstdint>
-#include "rapidjson/document.h"
+#include <cmath>
 
 #include "utils/json.hpp"
-#include "settings/locations.hpp"
-#include "settings/main.hpp"
-#include "settings/debug.hpp"
 #include "utils/logger.hpp"
 
-// Windows is stupid
-#ifdef GetObject
-#undef GetObject
-#endif
+#include "settings/locations.hpp"
+#include "settings/render.hpp"
+#include "settings/main.hpp"
+#include "settings/debug.hpp"
 
-std::tuple<int, int, int, int> Map::get_surrounding(const int row, const int col) {
+#include "player.hpp"
+#include "main.hpp"
+
+#include "map.hpp"
+
+#include "agents.hpp" // TMP
+
+bool Map::load_chunk_data(rapidjson::Value& chunk_json, const size_t& chunk_x, const size_t& chunk_y, std::set<std::string>& tile_textures, std::vector<ActorConstructor>& actor_constructors) {
+    map_data[chunk_y][chunk_x] = MapChunk();
+    MapChunk* chunk = get_chunk(chunk_x, chunk_y);
+    for (int row_index = 0; row_index < chunk_size; ++row_index) {
+        for (int col_index = 0; col_index < chunk_size; ++col_index) {
+            chunk->data[row_index][col_index] = MapTile{
+                "td:none",
+                "td:none",
+                0,
+                (int(chunk_x)*chunk_size)+col_index,
+                (int(chunk_y)*chunk_size)+row_index,
+                nullptr,
+                std::vector<RenderAgentEntity*>(),
+                std::vector<ActorInstance*>(1, nullptr),
+                std::vector<MapTileEffectInstance>()
+            };
+        }
+    }
+
+    if (chunk_json.Size() == 0) {
+        LOG(LogLevel::Warning, "Chunk (%d, %d) is empty.", chunk_x, chunk_y);
+        return true;
+    }
+    if (chunk_json.Size() > chunk_size) {
+        LOG(LogLevel::Warning, "Chunk (%d, %d): count of rows > chunk size (%d).", chunk_x, chunk_y, chunk_size);
+    }
+
+    for (int row_index = 0; row_index < chunk_size; ++row_index) {
+        if (row_index >= int(chunk_json.Size()))
+            break;
+        if (chunk_json[row_index].Size() > chunk_size) {
+            LOG(LogLevel::Warning, "Chunk (%d, %d): row %d: count of colums > chunk size (%d).", chunk_x, chunk_y, row_index, chunk_size);
+        }
+
+        for (int col_index = 0; col_index < chunk_size; ++col_index) {
+            if (col_index >= int(chunk_json[row_index].Size()))
+                break;
+
+            rapidjson::Value& tile_json = chunk_json[row_index][col_index];
+            if ((!tile_json.IsArray()) && (!tile_json.IsObject())) {
+                LOG(LogLevel::Error, "Chunk (%d, %d): tile (%d, %d) seems be neither an object nor an array.", int(chunk_x), int(chunk_y), col_index, row_index);
+                continue;
+            }
+
+            // Loading tile //
+            MapTile& tile = chunk->data[row_index][col_index];
+            if (tile_json.HasMember("base")) {
+                if (tile_json["base"].IsString())
+                    tile.base = tile_json["base"].GetString();
+                else
+                    LOG(LogLevel::Warning, "Chunk (%d, %d): tile (%d, %d): attibute \"base\" should be of type string.", int(chunk_x), int(chunk_y), col_index, row_index);
+            }
+            if (tile_json.HasMember("top")) {
+                if (tile_json["top"].IsString())
+                    tile.top = tile_json["top"].GetString();
+                else
+                    LOG(LogLevel::Warning, "Chunk (%d, %d): tile (%d, %d): attibute \"top\" should be of type string.", int(chunk_x), int(chunk_y), col_index, row_index);
+            }
+            if (tile_json.HasMember("height")) {
+                if (tile_json["height"].IsInt())
+                    tile.height = tile_json["height"].GetInt();
+                else
+                    LOG(LogLevel::Warning, "Chunk (%d, %d): tile (%d, %d): attibute \"height\" should be of type int.", int(chunk_x), int(chunk_y), col_index, row_index);
+            }
+
+            // TODO: effects
+
+            // Actors //
+            if (tile_json.HasMember("actors")) {
+                if (tile_json["actors"].IsArray()) {
+                    ActorConstructor constructor = ActorConstructor{"td:none", -1, (int(chunk_x)*chunk_size)+col_index, (int(chunk_y)*chunk_size)+row_index};
+                    for (rapidjson::SizeType actor_index = 0; actor_index < tile_json["actors"].Size(); ++actor_index) {
+                        rapidjson::Value& actor_json = tile_json["actors"][actor_index];
+                        if (actor_json.HasMember("id")) {
+                            if (actor_json["id"].IsString()) {
+                                constructor.id = actor_json["id"].GetString();
+                                if (actor_json.HasMember("owner")) {
+                                    if (actor_json["owner"].IsInt()) {
+                                        constructor.owner = actor_json["owner"].GetInt();
+                                        LOG(LogLevel::Debug, "New actor \"%s\" at (%d, %d): owner: %d", constructor.id.c_str(), constructor.col, constructor.row, constructor.owner);
+                                        actor_constructors.push_back(constructor);
+                                    } else {
+                                        LOG(LogLevel::Warning, "Chunk (%d, %d): tile (%d, %d): actor %d: attibute \"owner\" should be of type int.", int(chunk_x), int(chunk_y), col_index, row_index, int(actor_index));
+                                    }
+                                } else {
+                                    LOG(LogLevel::Warning, "Chunk (%d, %d): tile (%d, %d): actor %d is missing an \"owner\" attribute.", int(chunk_x), int(chunk_y), col_index, row_index, int(actor_index));
+                                }
+                            } else {
+                                LOG(LogLevel::Warning, "Chunk (%d, %d): tile (%d, %d): actor %d: attibute \"id\" should be of type string.", int(chunk_x), int(chunk_y), col_index, row_index, int(actor_index));
+                            }
+                        } else {
+                            LOG(LogLevel::Warning, "Chunk (%d, %d): tile (%d, %d): actor %d is missing an \"id\" attribute.", int(chunk_x), int(chunk_y), col_index, row_index, int(actor_index));
+                        }
+                    }
+                } else
+                    LOG(LogLevel::Warning, "Chunk (%d, %d): tile (%d, %d): attibute \"actors\" should be of type array.", int(chunk_x), int(chunk_y), col_index, row_index);
+            }
+
+            tile_textures.insert(tile.base);
+            tile_textures.insert(tile.top);
+        }
+    }
+
+    tile_textures.erase("td:none");
+
+    return true;
+};
+
+bool Map::load_chunk_entities(const int& chunk_x, const int& chunk_y, std::vector<std::tuple<int, int, RenderAgentEntity>>& entities) {
+    MapChunk* chunk = get_chunk(chunk_x, chunk_y);
+    if (!chunk){
+        LOG(LogLevel::Warning, "Could not load chunk entities: chunk (%d, %d) not loaded/does not exist.", chunk_x, chunk_y);
+        return false;
+    }
+
+    std::string sprite_id;
+    RenderAgentEntity entity;
+    int x, y;
+    int actual_height_index;
+    for (int row_index = 0; row_index < chunk_size; ++row_index) {
+        for (int col_index = 0; col_index < chunk_size; ++col_index) {
+            MapTile& current_tile = chunk->data[row_index][col_index];
+
+            x = (chunk_x*chunk_size)+col_index;
+            y = (chunk_y*chunk_size)+row_index;
+            for (int height_index = 0; height_index <= current_tile.height; ++height_index) {
+                if (height_index == current_tile.height) {
+                    sprite_id = current_tile.top;
+                } else {
+                    sprite_id = current_tile.base;
+                }
+                if (sprite_id == "td:none")
+                    continue;
+
+                entity = RenderAgentEntity();
+                entity.sprite = agent->get_sprite(sprite_id);
+                if (!entity.sprite) {
+                    LOG(LogLevel::Warning, "Chunk (%d, %d): tile (%d, %d): could not add entity for height index %d: sprite \"%s\" does not exist.", chunk_x, chunk_y, col_index, row_index, height_index, sprite_id.c_str());
+                    entity.sprite = agent->get_sprite("td:missing_tile");
+                }
+                //               |-------------------rows before--------------------| |----------this row----------|             |-this tile-|
+                entity.layer = (((((chunk_y*chunk_size)+row_index)*(cols*chunk_size))+(chunk_x*chunk_size)+col_index)*chunk_size)+height_index;
+
+                actual_height_index = (height_index == current_tile.height)
+                    ? height_index-1
+                    : height_index;
+
+                entity.x = (16*(x-y));
+                entity.y = (11*(y+x)-(16*actual_height_index));
+                if (entity.sprite)
+                    entity.animation = SDL_rand(entity.sprite->animations.size());
+                entity.rotation = 0;
+                entity.movable = false;
+
+                entities.push_back(std::tuple<int, int, RenderAgentEntity>(x, y, entity));
+            }
+        }
+    }
+
+    return true;
+};
+
+
+
+std::tuple<int, int, int, int> Map::get_surrounding(const int& col, const int& row) {
+    MapTile* tile_up = get_tile(col, row-1, true);
+    MapTile* tile_down = get_tile(col, row+1, true);
+    MapTile* tile_left = get_tile(col-1, row, true);
+    MapTile* tile_right = get_tile(col+1, row, true);
     return std::tuple<int, int, int, int> {
-        (row > 0)
-            ? map_data[row-1][col].height
+        (tile_up)
+            ? tile_up->height
             : -1,
-        (row < (int)rows-1)
-            ? map_data[row+1][col].height
+        (tile_down)
+            ? tile_down->height
             : -1,
-        (col > 0)
-            ? map_data[row][col-1].height
+        (tile_left)
+            ? tile_left->height
             : -1,
-        (col < (int)cols-1)
-            ? map_data[row][col+1].height
+        (tile_right)
+            ? tile_right->height
             : -1
     };
-}
+};
 
-MapTile* Map::get_tile(const int row, const int col, const bool suppress_logs) {
-    if (!(row < (int)rows) || !(col < (int)cols)) {
+MapChunk* Map::get_chunk(const int& chunk_x, const int& chunk_y, const bool& suppress_logs) {
+    if (chunk_y >= int(map_data.size())) {
         if (!suppress_logs)
-            LOG(LogLevel::Warning, "Requested non-existent tile at %dx%d", col, row);
+            LOG(LogLevel::Warning, "Requested non-existend chunk at (%d, %d)", chunk_x, chunk_y);
         return nullptr;
-    }   
-    return &map_data[row][col];
-}
+    }
+    if (chunk_x >= int(map_data[chunk_y].size())) {
+        if (!suppress_logs)
+            LOG(LogLevel::Warning, "Requested non-existend chunk at (%d, %d)", chunk_x, chunk_y);
+        return nullptr;
+    }
+
+    return &map_data[chunk_y][chunk_x];
+};
+
+MapTile* Map::get_tile(const int& col, const int& row, const bool& suppress_logs) {
+    int chunk_y = std::floor(row/chunk_size);
+    int chunk_x = std::floor(col/chunk_size);
+    int tile_y = row % chunk_size;
+    int tile_x = col % chunk_size;
+
+    if (chunk_y >= int(map_data.size())) {
+        if (!suppress_logs)
+            LOG(LogLevel::Warning, "Requested non-existend chunk at (%d, %d)", chunk_x, chunk_y);
+        return nullptr;
+    }
+    if (chunk_x >= int(map_data[chunk_y].size())) {
+        if (!suppress_logs)
+            LOG(LogLevel::Warning, "Requested non-existend chunk at (%d, %d)", chunk_x, chunk_y);
+        return nullptr;
+    }
+
+    return &map_data[chunk_y][chunk_x].data[tile_y][tile_x];
+};
+
+
+
+bool Map::load_chunks(const std::vector<std::tuple<int, int>>& chunk_positions) {
+    const int chunk_count = chunk_positions.size();
+    rapidjson::Document map_json = open_json(replace_locations(path));
+    if (!map_json.HasMember("data")) {
+        LOG(LogLevel::Error, "Could not load map %s: json does not contain a \"data\" object.", name.c_str());
+        return false;
+    }
+    if (map_json["data"].Size() == 0) {
+        LOG(LogLevel::Error, "Could not load map %s: \"data\" object can not be empty.", name.c_str());
+        return false;
+    }
+
+    // Load //
+    LOG(LogLevel::Debug, "Loading tiles..");
+    std::set<std::string> tile_textures;
+    std::vector<std::vector<ActorConstructor>> actor_constructors(chunk_count);
+    if (SETTINGS["multithreading"].get<bool>()) {
+        const int configured_threads = SETTINGS["num_threads"].get<int>();
+        const size_t num_threads = (configured_threads == -1)
+            ? std::max(1u, std::thread::hardware_concurrency())
+            : (size_t)std::max(1, configured_threads);
+
+        BS::thread_pool pool(num_threads);
+
+        std::vector<std::set<std::string>> thread_texture_sets(chunk_count);
+        std::atomic<bool> ok{true};
+        std::vector<std::future<void>> futures;
+        futures.reserve(chunk_count);
+
+        int i = 0;
+        for (auto& [chunk_x, chunk_y] : chunk_positions) {
+            futures.emplace_back(
+                pool.submit_task([this, i, &map_json, chunk_x, chunk_y, &ok, &thread_texture_sets, &actor_constructors]() {
+                    if (!ok.load(std::memory_order_relaxed)) return;
+
+                    bool chunk_ok = this->load_chunk_data(map_json["data"][chunk_y][chunk_x], chunk_x, chunk_y, thread_texture_sets[i], actor_constructors[i]);
+                    if (!chunk_ok) ok.store(false, std::memory_order_relaxed);
+                })
+            );
+            i++;
+        }
+
+        for (auto& future : futures) future.get();
+
+        if (!ok.load()) {
+            for (int chunk_y = 0; chunk_y < int(rows); ++chunk_y) {
+                map_data[chunk_y].clear();
+            }
+            return false;
+        }
+
+        for (auto& set : thread_texture_sets) {
+            tile_textures.insert(set.begin(), set.end());
+        }
+    } else {
+        int i = 0;
+        for (auto& [chunk_x, chunk_y] : chunk_positions) {
+            if (!load_chunk_data(map_json["data"][chunk_y][chunk_x], chunk_x, chunk_y, tile_textures, actor_constructors[i])) {
+                LOG(LogLevel::Warning, "Could not load chunk (%d, %d)", chunk_x, chunk_y);
+            }
+            i++;
+        }
+    }
+
+    LOG(LogLevel::Debug, "Baking atlas..");
+    std::vector<std::string> vector_tile_textures;
+    for (auto& texture : tile_textures) {
+        vector_tile_textures.push_back(texture);
+    }
+    if (!agent->get_texture(atlas_name, true)) {
+        vector_tile_textures.push_back("td:tile_missing");
+        vector_tile_textures.push_back("td:top_missing");
+        vector_tile_textures.push_back("td:missing");
+        if (!agent->bake_atlas(atlas_name, vector_tile_textures))
+            LOG(LogLevel::Error, "Could not bake map atlas \"%s\"", atlas_name.c_str());
+    } else {
+        for (auto& texture_id : vector_tile_textures) {
+            if (!agent->get_sprite(texture_id, false)) {
+                if (!agent->add_to_atlas(atlas_name, texture_id))
+                    LOG(LogLevel::Error, "Could not add texture \"%s\" to map atlas.", texture_id.c_str());
+            }
+        }
+    }
+
+    // Entities //
+    LOG(LogLevel::Debug, "Making Entitys..");
+    std::vector<std::vector<std::tuple<int, int, RenderAgentEntity>>> entity_cache(chunk_count);
+    if (SETTINGS["multithreading"].get<bool>()) {
+        const int configured_threads = SETTINGS["num_threads"].get<int>();
+        const size_t num_threads = (configured_threads == -1)
+            ? std::max(1u, std::thread::hardware_concurrency())
+            : (size_t)std::max(1, configured_threads);
+
+        BS::thread_pool pool(num_threads);
+        std::atomic<bool> ok{true};
+        std::vector<std::future<void>> futures;
+        futures.reserve(chunk_count);
+
+        int i = 0;
+        for (auto& [chunk_x, chunk_y] : chunk_positions) {
+            futures.emplace_back(
+                pool.submit_task([this, i, chunk_x, chunk_y, &ok, &entity_cache]() {
+                    if (!ok.load(std::memory_order_relaxed)) return;
+
+                    bool chunk_ok = this->load_chunk_entities(chunk_x, chunk_y, entity_cache[i]);
+                    if (!chunk_ok) ok.store(false, std::memory_order_relaxed);
+                })
+            );
+            i++;
+        }
+
+        for (auto& future : futures) future.get();
+
+        if (!ok.load()) {
+            for (size_t i = 0; i < entity_cache.size(); ++i) {
+                entity_cache[i].clear();
+            }
+            return false;
+        }
+    } else {
+        int i = 0;
+        for (auto& [chunk_x, chunk_y] : chunk_positions) {
+            if (!load_chunk_entities(chunk_x, chunk_y, entity_cache[i])) {
+                LOG(LogLevel::Warning, "Could not load chunk (%d, %d)", chunk_x, chunk_y);
+            }
+            i++;
+        }
+    }
+
+    // Dimensions //
+    LOG(LogLevel::Debug, "Setting dimesions of quadtrees..");
+    int quadtree_tx, quadtree_ty, quadtree_w, quadtree_h;
+    agent->get_dimensions(quadtree_tx, quadtree_ty, quadtree_w, quadtree_h);
+    int quadtree_bx = quadtree_w+quadtree_tx;
+    int quadtree_by = quadtree_h+quadtree_ty;
+    for (auto& chunk_entities : entity_cache) {
+        for (auto& [entity_col, entity_row, entity] : chunk_entities) {
+            quadtree_tx = std::min(quadtree_tx, entity.x);
+            quadtree_ty = std::min(quadtree_ty, entity.y);
+            quadtree_bx = std::max(quadtree_bx, entity.x+entity.sprite->animations[0].texture_rects[0].w);
+            quadtree_by = std::max(quadtree_by, entity.y+entity.sprite->animations[0].texture_rects[0].h);
+        }
+    }
+    agent->set_dimensions(quadtree_tx, quadtree_ty, quadtree_bx-quadtree_tx, quadtree_by-quadtree_ty);
+    ACTORS_RENDER_AGENT->set_dimensions(quadtree_tx, quadtree_ty-100, quadtree_bx-quadtree_tx, quadtree_by-quadtree_ty+100); // Do this in the Map constructor
+
+    LOG(LogLevel::Debug, "Spawning actors..");
+    for (auto& chunk_actors : actor_constructors) {
+        for (ActorConstructor& constructor : chunk_actors) {
+            if ((constructor.owner < 0) || (constructor.owner >= PLAYER_COUNT))
+                continue;
+            map_data[std::floor(constructor.row/chunk_size)][std::floor(constructor.col/chunk_size)].data[constructor.row%chunk_size][constructor.col%chunk_size].actors[0] = PLAYERS[constructor.owner].actor_handler->spawn_actor(constructor.id, constructor.col, constructor.row);
+        }
+    }
+
+
+    // Inserting Entities //
+    LOG(LogLevel::Debug, "Adding Entitys..");
+    for (std::vector<std::tuple<int, int, RenderAgentEntity>>& chunk_entities : entity_cache) {
+        for (auto& [entity_col, entity_row, entity] : chunk_entities) {
+            if (&entity == &std::get<2>(chunk_entities.back()))
+                map_data[std::floor(entity_row/chunk_size)][std::floor(entity_col/chunk_size)].data[entity_row%chunk_size][entity_col%chunk_size].top_entity = agent->insert_entity(entity, false);
+            else
+                map_data[std::floor(entity_row/chunk_size)][std::floor(entity_col/chunk_size)].data[entity_row%chunk_size][entity_col%chunk_size].base_entities.push_back(agent->insert_entity(entity, false));
+        }
+    }
+    LOG(LogLevel::Debug, "Subdividing quadtree..");
+    agent->trigger_subdivision();
+
+    return true;
+};
+
+
 
 Map::Map(RenderAgent* agent, const std::filesystem::path& map_path) {
-    const std::string map_path_str = replace_locations(map_path).u8string();
-    LOG(LogLevel::Info, "Loading map \"%s\"", map_path_str.c_str());
-    Uint64 load_start_time = SDL_GetPerformanceCounter();
-    Uint64 preformance_frequency = SDL_GetPerformanceFrequency();
-
     this->agent = agent;
-    // CHECKS AND BASIC DATA //
-    this->map_path = map_path;
-    const rapidjson::Document& map_json = open_json(replace_locations(map_path));
+    this->path = map_path;
+    LOG(LogLevel::Debug, "Loading json data");
+    rapidjson::Document map_json = open_json(replace_locations(path));
+    LOG(LogLevel::Debug, "Done loading json data");
     if (!map_json.IsObject()) {
-        LOG(LogLevel::Error, "Could not load map %s: root is not an object.", map_path_str.c_str());
+        LOG(LogLevel::Error, "Could not load map \"%s\": root is not an object.", path.u8string().c_str());
         return;
     }
     if (!map_json.HasMember("name")) {
-        LOG(LogLevel::Error, "Could not load map %s: json does not contain a \"name\" object.", map_path_str.c_str());
+        LOG(LogLevel::Error, "Could not load map \"%s\": json does not contain a \"name\" object.", path.u8string().c_str());
         return;
     }
-    map_name = std::string(map_json["name"].GetString());
+    name = std::string(map_json["name"].GetString());
+
     if (map_json.HasMember("description")) {
-        map_description = std::string(map_json["description"].GetString());
+        description = std::string(map_json["description"].GetString());
     } else {
-        map_description = "No discription given";
+        description = "No discription given";
     }
+
     if (!map_json.HasMember("data")) {
-        LOG(LogLevel::Error, "Could not load map %s: json does not contain a \"data\" object.", map_name.c_str());
+        LOG(LogLevel::Error, "Could not load map \"%s\": json does not contain a \"data\" object.", name.c_str());
         return;
     }
     if (map_json["data"].Size() == 0) {
-        LOG(LogLevel::Error, "Could not load map %s: \"data\" object can not be empty.", map_name.c_str());
+        LOG(LogLevel::Error, "Could not load map \"%s\": \"data\" object can not be empty.", name.c_str());
         return;
     }
 
-    // DECLARATIONS //
-    /* TODO: re-add
-    if (map_json.HasMember("declarations")) {
-        if (map_json["declarations"].HasMember("textures")) {
-            for (const auto& declaration : map_json["declarations"]["textures"].GetObject()) {
-                TextureConstructor* texture_constructors[declaration.value.Size()];
-                for (size_t constructor_index = 0; constructor_index < declaration.value.Size(); ++constructor_index) {
-                    texture_constructors[constructor_index] = new TextureConstructor(
-                        declaration.value[constructor_index].HasMember("texture") ?
-                            declaration.value[constructor_index]["texture"].GetString() :
-                            "td:tile_missing",
-                        (!agent->get_texture(declaration.value[constructor_index]["texture"].GetString())) ?
-                            "td:none" :
-                            (declaration.value[constructor_index].HasMember("texture") ?
-                                actor->get_png_path(declaration.value[constructor_index]["texture"].GetString()) :
-                                actor->get_png_path("td:tile_missing")),
-                        declaration.value[constructor_index].HasMember("x") ?
-                            declaration.value[constructor_index]["x"].GetInt() :
-                            0,
-                        declaration.value[constructor_index].HasMember("y") ?
-                            declaration.value[constructor_index]["y"].GetInt() :
-                            0,
-                        declaration.value[constructor_index].HasMember("size") ?
-                            declaration.value[constructor_index]["size"].GetInt() :
-                            1
-                    );
-                }
-                agent->insert_texture(declaration.name.GetString(), agent->bake_texture(texture_constructors, (sizeof(texture_constructors) / sizeof(texture_constructors[0]))));
-            }
-        }
-    }
-    */
-
-    // LOADING MAP DATA //
     // Allocate //
+    LOG(LogLevel::Debug, "Allocating");
     rows = map_json["data"].Size();
-    cols = 0;
-    map_data = new MapTile*[rows];
-    entity_cache = new std::vector<RenderAgentEntity>*[rows];
+    cols = map_json["data"][0].Size();
+    map_data = std::vector<std::vector<MapChunk>>(rows, std::vector<MapChunk>(cols));
+    atlas_name = "map:"+name+":atlas:tile_textures";
+};
 
-    // Load //
-    std::set<std::string> tile_textures;
-    // TODO: Rework to give out one std::vector
-    if (SETTINGS["multithreading"].get<bool>()) {
-        for (size_t r = 0; r < rows; ++r) {
-            cols = std::max(cols, (size_t)map_json["data"][r].Size());
-        }
-
-        const int configured_threads = SETTINGS["num_threads"].get<int>();
-        const size_t num_threads = (configured_threads == -1)
-            ? std::max(1u, std::thread::hardware_concurrency())
-            : (size_t)std::max(1, configured_threads);
-
-        BS::thread_pool pool(num_threads);
-
-        std::vector<std::set<std::string>> thread_texture_sets(num_threads);
-        std::atomic<bool> ok{true};
-
-        // IMPORTANT: store futures
-        std::vector<std::future<void>> futures;
-        futures.reserve(rows);
-
-        for (size_t r = 0; r < rows; ++r) {
-            futures.emplace_back(
-                pool.submit_task([this, &map_json, r, &ok, &thread_texture_sets, num_threads]() {
-                    if (!ok.load(std::memory_order_relaxed)) return;
-
-                    size_t bucket = r % num_threads;
-
-                    const auto& row_val = map_json["data"][r];
-                    map_data[r] = new MapTile[row_val.Size()];
-
-                    bool row_ok = this->load_row(row_val, r, thread_texture_sets[bucket]);
-                    if (!row_ok) ok.store(false, std::memory_order_relaxed);
-                })
-            );
-        }
-
-        for (auto& f : futures) f.get();
-
-        if (!ok.load()) {
-            for (size_t r = 0; r < rows; ++r) {
-                delete[] map_data[r];
-            }
-            delete[] map_data;
-            return;
-        }
-
-        for (auto& s : thread_texture_sets) {
-            tile_textures.insert(s.begin(), s.end());
-        }
-        tile_textures.erase("td:none");
-
-    } else {
-        for (size_t index = 0; index < rows; ++index) {
-            cols = std::max(int(cols), int(map_json["data"][index].Size()));
-            map_data[index] = new MapTile[map_json["data"][index].Size()];
-            load_row(map_json["data"][index], index, tile_textures);
-        }
-        tile_textures.erase("td:none");
-    }
-
-    // Baking Atlas //
-    tile_textures.insert("td:tile_missing");
-    tile_textures.insert("td:top_missing");
-    std::vector<std::string> vector_tile_textures;
-    for (auto& texture : tile_textures) { // TODO: remove, make tile_textures be a std::vector by default
-        vector_tile_textures.push_back(texture);
-    }
-    const std::string atlas_tile_textures_name = "map:"+map_name+":atlas:tile_textures";
-    agent->bake_atlas(atlas_tile_textures_name, vector_tile_textures);
-    agent->set_dimensions(-(16*(rows-1)), -100, 11*(cols+rows-1)*2, 16*rows*2); // FIXME: tiles with a large height can be above y=0
-
-    // Add entitys //
-    if (SETTINGS["multithreading"].get<bool>()) {
-        const int configured_threads = SETTINGS["num_threads"].get<int>();
-        const size_t num_threads = (configured_threads == -1)
-            ? std::max(1u, std::thread::hardware_concurrency())
-            : (size_t)std::max(1, configured_threads);
-
-        BS::thread_pool pool(num_threads);
-
-        std::atomic<bool> ok{true};
-
-        // IMPORTANT: store futures
-        std::vector<std::future<void>> futures;
-        futures.reserve(rows);
-
-        for (size_t r = 0; r < rows; ++r) {
-            futures.emplace_back(
-                pool.submit_task([this, &map_json, r, &ok, num_threads]() {
-                    if (!ok.load(std::memory_order_relaxed)) return;
-
-                    const auto& row_val = this->map_data[r];
-                    entity_cache[r] = new std::vector<RenderAgentEntity>[map_json["data"][r].Size()];
-
-                    bool row_ok = this->make_row_entitys(row_val, map_json["data"][r].Size(), r);
-                    if (!row_ok) ok.store(false, std::memory_order_relaxed);
-                })
-            );
-        }
-
-        for (auto& f : futures) f.get();
-
-        if (!ok.load()) {
-            for (size_t r = 0; r < rows; ++r) {
-                for (size_t c = 0; c < map_json["data"][r].Size(); ++c)
-                    entity_cache[r][c].clear();
-                delete[] entity_cache[r];
-            }
-            delete[] entity_cache;
-            return;
-        }
-    } else {
-        for (size_t index = 0; index < rows; ++index) {
-            entity_cache[index] = new std::vector<RenderAgentEntity>[map_json["data"][index].Size()];
-            make_row_entitys(map_data[index], map_json["data"][index].Size(), index);
-        }
-    }
-
-    LOG(LogLevel::Info, "Adding Entitys..");
-    for (size_t r = 0; r < rows; ++r) {
-        const auto row_size = map_json["data"][r].Size();
-        for (size_t c = 0; c < row_size; ++c) {
-            int height_index = 0;
-            for (RenderAgentEntity& current_entity : entity_cache[r][c]) {
-                const auto [surrounding_height_top, surrounding_height_bottom, surrounding_height_left, surrounding_height_right] = get_surrounding(r, c);
-                int surrounding_height = std::min(
-                    surrounding_height_bottom,
-                    surrounding_height_right
-                );
-                if (surrounding_height <= height_index+1) {
-                    RenderAgentEntity& top_entity = entity_cache[r][c].back();
-                    if (
-                        ((top_entity.x == current_entity.x) && (top_entity.y == current_entity.y)) ||
-                        (surrounding_height < height_index)
-                    ) {
-                        if (current_entity.layer == -1) {
-                            agent->heighest_layer = agent->heighest_layer+1;
-                            current_entity.layer = agent->heighest_layer;
-                        }
-                        agent->insert_entity(current_entity, false);
-                    }
-                } else {
-                    //LOG(LogLevel::Debug, "Skipping tile \"%s\"", current_entity.name.c_str());
-                }
-                height_index++;
-            }
-            entity_cache[r][c].clear();
-        }
-    }
-
-    LOG(LogLevel::Info, "Subdividing quadtree..");
-    agent->trigger_subdivision();
-
-    // CLEANUP //
-    for (size_t r = 0; r < rows; ++r)
-        delete[] entity_cache[r];
-    delete[] entity_cache;
-    if (map_json.HasMember("declarations")) {
-        if (map_json["declarations"].HasMember("textures")) {
-            for (const auto& declaration : map_json["declarations"]["textures"].GetObject()) {
-                agent->drop_texture(declaration.name.GetString());
-            }
-        }
-    }
-
-    Uint64 elapsed_ticks = SDL_GetPerformanceCounter() - load_start_time;
-    double elapsed_ms = (elapsed_ticks / (double)preformance_frequency) * 1000.0;
-    LOG(LogLevel::Info, "Loaded Map \"%s\" in %f ms", map_name.c_str(), elapsed_ms);
-
-    //for (size_t col_index = 0; col_index < cols; ++col_index) {LOG(LogLevel::Debug, "Tile %s at %dx%d", map_data[0][col_index].top_tile.c_str(), map_data[0][col_index].x, map_data[0][col_index].y);}
-}
-
-Map::~Map() {
-    for (size_t index = 0; index < rows; ++index) {
-        delete[] map_data[index];
-    }
-    delete[] map_data;
-}
-
-
-
-bool Map::load_row(const rapidjson::GenericValue<rapidjson::UTF8<>>& row_json, const size_t row_index, std::set<std::string>& tile_textures) {
-    for (size_t col_index = 0; col_index < row_json.Size(); ++col_index) {
-        const auto& tile_json = (row_json[col_index].IsObject()) ? row_json[col_index] : row_json[col_index][0];
-
-        // Checking for errors //
-        if ((!row_json[col_index].IsArray()) && (!row_json[col_index].IsObject())) {
-            LOG(LogLevel::Error, "Could not load row %d of map %s: tile %d;%d seems be neither an object nor an array", int(row_index), map_name.c_str(), int(col_index), int(row_index));
-            return false;
-        }
-        if (!(tile_json.HasMember("base"))) {
-            LOG(LogLevel::Error, "Could not load row %d of map %s: tile %d;%d seems to be missing a \"base\" object.", int(row_index), map_name.c_str(), int(col_index), int(row_index));
-            return false;
-        }
-
-        // Loading tile //
-        MapTile current_tile = MapTile(tile_json["base"].GetString(), int(col_index), int(row_index));
-        current_tile.top_tile = (tile_json.HasMember("top_tile")) ? tile_json["top_tile"].GetString() : "td:none";
-        current_tile.top = (tile_json.HasMember("top"))           ? tile_json["top"].GetString()      : "td:none";
-        current_tile.height = (tile_json.HasMember("height"))     ? tile_json["height"].GetInt()      : 1;
-        current_tile.size = (tile_json.HasMember("size"))         ? tile_json["size"].GetInt()        : 1;
-        // TODO: loading resoures
-
-        map_data[row_index][col_index] = current_tile;
-
-        tile_textures.insert(current_tile.base);
-        tile_textures.insert(current_tile.top_tile);
-        tile_textures.insert(current_tile.top);
-    }
-    return true;
-}
-
-RenderAgentEntity Map::make_tile_entity(const std::string& sprite_id, const int& x, const int& y, const int& height_index) {
-    uint8_t selected_animation = 0;
-    /* TODO: fix
-    if (sprite != nullptr) {
-        width = sprite->animations[0].texture_rects[0].w;
-        height = sprite->animations[0].texture_rects[0].h;
-        std::vector<std::string> keys;
-        for (auto& [key, animation] : sprite->animations) {
-            if (key.rfind("alt", 0) == 0) {
-                keys.push_back(key);
-            }
-        }
-        if (!keys.empty()) {
-            int random_index = SDL_rand(keys.size());
-            selected_animation = keys[random_index];
-        }
-    }
-    */
-
-    RenderAgentEntity entity;
-    entity.sprite = agent->get_sprite(sprite_id);
-    if (!entity.sprite) {
-        LOG(LogLevel::Warning, "Could not make entity at %d x %d: sprite \"%s\" does not exist.", x, y, sprite_id.c_str());
-        entity.sprite = agent->get_sprite("td:missing_tile");
-    }
-    entity.layer = agent->heighest_layer;
-
-    entity.x = (16*(x-y));
-    entity.y = (11*(y+x)-(16*height_index));
-    entity.animation = selected_animation;
-    entity.animation_frame = 0;
-    entity.rotation = 0;
-    entity.movable = false;
-
-    return entity;
-}
-
-bool Map::make_row_entitys(MapTile row[], size_t row_size, int row_index) {
-    for (size_t col_index = 0; col_index < row_size; ++col_index) {
-        MapTile& current_tile = row[col_index];
-        std::string map_entity_name = "map:tile:"+std::to_string(current_tile.x)+"x"+std::to_string(current_tile.y);
-        for (int height_index = 0; height_index < current_tile.height; ++height_index) {
-            if ((current_tile.top_tile != "td:none") && (height_index == current_tile.height-1)) {
-                entity_cache[row_index][col_index].push_back(make_tile_entity(
-                    current_tile.top_tile,
-                    current_tile.x,
-                    current_tile.y,
-                    height_index
-                ));
-            } else {
-                entity_cache[row_index][col_index].push_back(make_tile_entity(
-                    current_tile.base,
-                    current_tile.x,
-                    current_tile.y,
-                    height_index
-                ));
-            }
-        }
-        if ((current_tile.top_tile == "td:none") && (current_tile.top != "td:none")) {
-            entity_cache[row_index][col_index].push_back(make_tile_entity(
-                current_tile.top,
-                current_tile.x,
-                current_tile.y,
-                current_tile.height-1
-            ));
-        }
-
-        /*
-        // Loading building // // TODO: load any actor
-        if (row_json[col_index].IsArray() && (row_json[col_index].Size() > 1)) {
-            if (row_json[col_index].Size() > 2) {
-                LOG(LogLevel::Warning, "Tile %d;%d of map %s has more than 1 building! Only the first building will be loaded.", int(col_index), int(row_index), map_name.c_str());
-            }
-            if (!row_json[col_index][1].IsObject()) {
-                LOG(LogLevel::Error, "Could not load building on tile %d;%d of map %s: building has to be a json object.", int(col_index), int(row_index), map_name.c_str());
-            } else {
-                if (!row_json[col_index][1].HasMember("type")) {
-                    LOG(LogLevel::Error, "Could not load building on tile %d;%d of map %s: no \"type\" object found.", int(col_index), int(row_index), map_name.c_str());
-                } else {
-                    if (!(std::string(row_json[col_index][1]["type"].GetString()) == "td:Building")) {
-                        LOG(LogLevel::Error, "Could not load building on tile %d;%d of map %s: type is not of \"td:Building\" but is \"%s\".", int(col_index), int(row_index), map_name.c_str(), row_json[col_index][1]["type"].GetString());
-                    } else {
-                        LOG(LogLevel::Warning, "Building / Actor loading not implemented yet!");
-                    }
-                }
-            }
-        }
-        */
-    }
-    return true;
-}
+Map::~Map() {};

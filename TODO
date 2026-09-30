@@ -15,5 +15,7 @@ TODO: translate build.sh to CMake
 TODO: process isolation for the ModServer
 TODO: logger log level setting
 TODO: allow integers in actors functions arguments
+TODO: actors in map files should allow for extra arguments like hp, max hp, etc be set to non-default values optionaly
+FIXME: ModServer can not handle multiple nested requested functions from TD. Fix: rewrite mod-communication protocol
 FIXME: needed textures stored in set is shared between the threads loading the rows; this causes occasional crashes
 FIXME: CRT shader on windows just shows black window

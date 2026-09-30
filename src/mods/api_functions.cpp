@@ -16,6 +16,11 @@
 #include "actors.hpp"
 #include "main.hpp"
 #include "registry.hpp"
+#include "agents.hpp"
+
+// TODO: more and better error handling:
+//      nonsensical arguments are often not checked for -> crashes
+//      if the arguments are of wrong type / wrong count the return values aren't set
 
 void ModServerFunctions::log(rapidjson::Value& args, rapidjson::Document& output) {
     if (args.Size() < 3) {
@@ -36,10 +41,7 @@ void ModServerFunctions::log(rapidjson::Value& args, rapidjson::Document& output
         else if (loglevel_int == 4)
             loglevel = LogLevel::Critical;
         LOGGER.log("ModServer", args[2].GetString(), loglevel, args[1].GetString());
-        rapidjson::Value status;
-        status.SetInt(0);
-        rapidjson::Document::AllocatorType& allocator = output.GetAllocator();
-        output.AddMember("status", status, allocator);
+        output["status"].SetInt(0);
     }
 }
 
@@ -51,18 +53,16 @@ void ModServerFunctions::get_resource(rapidjson::Value& args, rapidjson::Documen
     } else {
         const std::string resource_id = args[0].GetString();
         int* resource_count = PLAYERS[0].get_resource(resource_id);
-        rapidjson::Value status;
         rapidjson::Value count;
         if (resource_count == nullptr) {
-            status.SetInt(1);
+            output["status"].SetInt(1);
             count.SetInt(0);
         } else {
-            status.SetInt(0);
+            output["status"].SetInt(0);
             count.SetInt(*resource_count);
         }
         rapidjson::Document::AllocatorType& allocator = output.GetAllocator();
-        output.AddMember("status", status, allocator);
-        output.AddMember("count", count, allocator);
+        output["return"].AddMember("count", count, allocator);
     }
 }
 
@@ -75,14 +75,11 @@ void ModServerFunctions::set_resource(rapidjson::Value& args, rapidjson::Documen
         const std::string resource_id = args[0].GetString();
         const int resource_count = args[1].GetInt();
         bool status_bool = PLAYERS[0].set_resource(resource_id, resource_count); // TODO: pass in player number as arg
-        rapidjson::Value status;
         if (status_bool) {
-            status.SetInt(1);
+            output["status"].SetInt(1);
         } else {
-            status.SetInt(0);
+            output["status"].SetInt(0);
         }
-        rapidjson::Document::AllocatorType& allocator = output.GetAllocator();
-        output.AddMember("status", status, allocator);
     }
 }
 
@@ -99,23 +96,21 @@ void ModServerFunctions::get_pos(rapidjson::Value& args, rapidjson::Document& ou
             if (instance)
                 break;
         }
-        rapidjson::Value status;
         rapidjson::Value col;
         rapidjson::Value row;
         if (instance == nullptr) {
             LOG(LogLevel::Warning, "Could not execute function \"get_pos\": instance not found");
-            status.SetInt(1);
+            output["status"].SetInt(1);
             col.SetInt(-1);
             row.SetInt(-1);
         } else {
-            status.SetInt(0);
+            output["status"].SetInt(0);
             col.SetInt(instance->x);
             row.SetInt(instance->y);
         }
         rapidjson::Document::AllocatorType& allocator = output.GetAllocator();
-        output.AddMember("status", status, allocator);
-        output.AddMember("col", col, allocator);
-        output.AddMember("row", row, allocator);
+        output["return"].AddMember("col", col, allocator);
+        output["return"].AddMember("row", row, allocator);
     }
 }
 
@@ -126,27 +121,24 @@ void ModServerFunctions::get_owner(rapidjson::Value& args, rapidjson::Document& 
         LOG(LogLevel::Warning, "Could not execute function \"get_owner\": one or more keys are of incorrect type: [str]");
     } else {
         const std::string actor_id = args[0].GetString();
-        ActorInstance* instance = nullptr;
         int result = -1;
         for (int i = 0; i < PLAYER_COUNT; ++i) {
-            if (PLAYERS[i].actor_handler->get_instance(actor_id, true)) {
+            if (PLAYERS[i].actor_handler->get_instance(actor_id, true) != nullptr) {
                 result = i;
                 break;
             }
         }
-        rapidjson::Value status;
         rapidjson::Value player_num;
-        if (instance == nullptr) {
+        if (result == -1) {
             LOG(LogLevel::Warning, "Could not execute function \"get_owner\": instance not found");
-            status.SetInt(1);
+            output["status"].SetInt(1);
             player_num.SetInt(-1);
         } else {
-            status.SetInt(0);
+            output["status"].SetInt(0);
             player_num.SetInt(result);
         }
         rapidjson::Document::AllocatorType& allocator = output.GetAllocator();
-        output.AddMember("status", status, allocator);
-        output.AddMember("player_num", player_num, allocator);
+        output["return"].AddMember("player_num", player_num, allocator);
     }
 }
 
@@ -157,31 +149,32 @@ void ModServerFunctions::get_faction(rapidjson::Value& args, rapidjson::Document
         LOG(LogLevel::Warning, "Could not execute function \"get_faction\": one or more keys are of incorrect type: [int]");
     } else {
         const int player_num = args[0].GetInt();
-
-        std::string faction;
-        if (player_num >= PLAYER_COUNT) {
-            LOG(LogLevel::Warning, "Could not execute function \"get_faction\": player_num (%d) must be < PLAYER_COUNT (%d)", player_num, PLAYER_COUNT);
-            faction = "";
+        if (player_num < 0 || player_num >= PLAYER_COUNT) {
+            LOG(LogLevel::Warning, "Could not execute function \"get_faction\": player with number %d does not exist!", player_num);
         } else {
-            faction = PLAYERS[player_num].faction;
+            std::string faction;
+            if (player_num >= PLAYER_COUNT) {
+                LOG(LogLevel::Warning, "Could not execute function \"get_faction\": player_num (%d) must be < PLAYER_COUNT (%d)", player_num, PLAYER_COUNT);
+                faction = "";
+            } else {
+                faction = PLAYERS[player_num].faction;
+            }
+            rapidjson::Value player_faction;
+            rapidjson::Document::AllocatorType& allocator = output.GetAllocator();
+            if (faction == "") {
+                output["status"].SetInt(1);
+                player_faction.SetString("", allocator);
+            } else {
+                output["status"].SetInt(0);
+                player_faction.SetString(faction.c_str(), allocator);
+            }
+            output["return"].AddMember("faction", player_faction, allocator);
         }
-        rapidjson::Value status;
-        rapidjson::Value player_faction;
-        rapidjson::Document::AllocatorType& allocator = output.GetAllocator();
-        if (faction == "") {
-            status.SetInt(1);
-            player_faction.SetString("", allocator);
-        } else {
-            status.SetInt(0);
-            player_faction.SetString(faction.c_str(), allocator);
-        }
-        output.AddMember("status", status, allocator);
-        output.AddMember("faction", player_faction, allocator);
     }
 }
 
 void ModServerFunctions::spawn_actor(rapidjson::Value& args, rapidjson::Document& output) {
-    if (args.Size() < 1) {
+    if (args.Size() < 4) {
         LOG(LogLevel::Warning, "Could not execute function \"spawn_actor\": args.Size() < 4");
     } else if (
         !args[0].IsString() ||
@@ -204,15 +197,12 @@ void ModServerFunctions::spawn_actor(rapidjson::Value& args, rapidjson::Document
             spawn_status = PLAYERS[player_num].actor_handler->spawn_actor(actor_id, col, row);
         }
         
-        rapidjson::Value status;
         if (!spawn_status) {
             LOG(LogLevel::Warning, "Could not execute function \"spawn_actor\": spawning failed");
-            status.SetInt(1);
+            output["status"].SetInt(1);
         } else {
-            status.SetInt(0);
+            output["status"].SetInt(0);
         }
-        rapidjson::Document::AllocatorType& allocator = output.GetAllocator();
-        output.AddMember("status", status, allocator);
     }
 }
 
@@ -228,21 +218,18 @@ void ModServerFunctions::delete_actor(rapidjson::Value& args, rapidjson::Documen
         for (int player_num = 0; player_num < PLAYER_COUNT; ++player_num) {
             instance = PLAYERS[player_num].actor_handler->get_instance(actor_id, true);
             if (instance) {
+                ACTORS_RENDER_AGENT->delete_entity(instance->entity);
                 PLAYERS[player_num].actor_handler->delete_instance(actor_id);
-                SDL_free(instance);
                 delete_status = true;
                 break;
             }
         }
-        rapidjson::Value status;
         if (!delete_status) {
             LOG(LogLevel::Warning, "Could not execute function \"delete_actor\": instance not found");
-            status.SetInt(1);
+            output["status"].SetInt(1);
         } else {
-            status.SetInt(0);
+            output["status"].SetInt(0);
         }
-        rapidjson::Document::AllocatorType& allocator = output.GetAllocator();
-        output.AddMember("status", status, allocator);
     }
 }
 
@@ -260,15 +247,12 @@ void ModServerFunctions::registry_add(rapidjson::Value& args, rapidjson::Documen
         const std::string key = args[1].GetString();
         const std::filesystem::path value = std::filesystem::path(args[2].GetString());
 
-        rapidjson::Value status;
         if (!REGISTRY->add(category, key, value)) {
             LOG(LogLevel::Warning, "Could not execute function \"registry_add\": REGISTRY returned false");
-            status.SetInt(1);
+            output["status"].SetInt(1);
         } else {
-            status.SetInt(0);
+            output["status"].SetInt(0);
         }
-        rapidjson::Document::AllocatorType& allocator = output.GetAllocator();
-        output.AddMember("status", status, allocator);
     }
 }
 
@@ -284,15 +268,12 @@ void ModServerFunctions::registry_load(rapidjson::Value& args, rapidjson::Docume
         const std::string category = args[0].GetString();
         const std::filesystem::path file = std::filesystem::path(args[1].GetString());
 
-        rapidjson::Value status;
         if (!REGISTRY->load(category, file)) {
             LOG(LogLevel::Warning, "Could not execute function \"registry_load\": REGISTRY returned false");
-            status.SetInt(1);
+            output["status"].SetInt(1);
         } else {
-            status.SetInt(0);
+            output["status"].SetInt(0);
         }
-        rapidjson::Document::AllocatorType& allocator = output.GetAllocator();
-        output.AddMember("status", status, allocator);
     }
 }
 
@@ -312,17 +293,15 @@ void ModServerFunctions::registry_get(rapidjson::Value& args, rapidjson::Documen
 
         const std::filesystem::path result = REGISTRY->get(category, key, default_value);
 
-        rapidjson::Value status;
         rapidjson::Value value;
         if (result == default_value) {
             LOG(LogLevel::Warning, "Could not execute function \"registry_get\": REGISTRY returned false");
-            status.SetInt(1);
+            output["status"].SetInt(1);
         } else {
-            status.SetInt(0);
+            output["status"].SetInt(0);
         }
         rapidjson::Document::AllocatorType& allocator = output.GetAllocator();
         value.SetString(result.c_str(), allocator);
-        output.AddMember("status", status, allocator);
-        output.AddMember("value", value, allocator);
+        output["return"].AddMember("value", value, allocator);
     }
 }

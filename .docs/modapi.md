@@ -216,24 +216,51 @@ A json file tells the computer were one frame starts and ends:
 }
 ```
 
+## Mod Server communication protocol
 
-## Exitcodes
+Request:
 
-### ModServer responses
+```json
+{
+    "id": "626c1aee-da5d-4a0c-be1d-593842feaf84",
+    "type": "execute",
+    "origin": "TD",
+    "data": {
+        "function": "td:nothing",
+        "args": ["td:human_palace-0"]
+    }
+}
+```
 
-| Code | Sender      | Description
-|:----:|:------------|:--------------
-| `-1` | `ModServer` | Requesting function
-| `0`  | `ModServer` | OK
-| `1`  | `ModServer` | Misc error
-| `2`  | `ModServer` | Unknown request type
-| `3`  | `ModServer` | ill formed request
-| `4`  | `ModServer` | invalid mod source code
+Response:
 
-### Function request responses
+```json
+{
+    "id": "626c1aee-da5d-4a0c-be1d-593842feaf84",
+    "type": "response",
+    "origin": "TDModServer",
+    "data": {
+        "status": 0,
+        "return": {}
+    }
+}
+```
 
-| Code | Sender               | Description
-|:----:|:---------------------|:--------------
-| `0`  | `ModServerConnector` | OK
-| `1`  | `ModServerConnector` | Misc error
-| `2`  | `ModServerConnector` | Unknown function
+| Type       | Description                                   | Direction        | Data payload
+|:-----------|:----------------------------------------------|:-----------------|:-----------------------------------
+| `execute`  | Request the other party to execute a function | either direction | `{"function": str, "args": array}`
+| `load_mod` | Request the mod server to load a mod          | TD -> ModServer  | `{"path": str}`
+| `status`   | Get the mod servers status                    | TD -> ModServer  | `{}`
+| `response` | Response to the other partys request          | either direction | `{"status": int, "return": any}`
+
+
+```python
+@dataclass
+class Request:
+    uuid: UUID
+    request_type: RequestType
+    origin: bool # True = TDModServer, False = TD
+    data: dict
+```
+
+**TODO**: finish

@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <deque>
 #include <cmath>
+#include <algorithm>
 #include "rapidjson/document.h"
 
 #include "renderring/render_agent.hpp"
@@ -51,6 +52,13 @@ RenderAgent::~RenderAgent() {
 void RenderAgent::set_dimensions(const int& x, const int& y, const int& width, const int& height) {
     agent_quadtree.set_dimensions(x, y, width, height);
     LOG(LogLevel::Debug, "Dimensions: x: %d, y: %d, map_width: %d, map_height: %d", x, y, width, height);
+}
+
+void RenderAgent::get_dimensions(int& x_out, int& y_out, int& w_out, int& h_out) {
+    x_out = agent_quadtree.x;
+    y_out = agent_quadtree.y;
+    w_out = agent_quadtree.width;
+    h_out = agent_quadtree.height;
 }
 
 
@@ -292,7 +300,7 @@ SDL_Texture* RenderAgent::bake_texture(std::vector<TextureConstructor*> construc
         } else {
             textures[i] = tmp_texture->texture;
         }
-    } 
+    }
 
     // Size
     int surface_width = 0;
@@ -354,7 +362,7 @@ bool RenderAgent::check_texture_ptr(RenderAgentTexture* ptr) {
 
 
 std::filesystem::path RenderAgent::get_png_path(const std::string& name) {
-    std::filesystem::path path = REGISTRY->get("textures", name, REGISTRY->get("textures", "td:tile_missing", std::filesystem::path("none"))); // TODO: change to "missing" after adding such a texture
+    std::filesystem::path path = REGISTRY->get("textures", name, REGISTRY->get("textures", "td:missing", replace_locations(std::filesystem::path("$texture_dir$/missing.png"))));
     if ((path.extension() == ".json") || (path.extension() == ".jsonc")) {
         rapidjson::Document spritesheet_json = open_json(path);
         if (!spritesheet_json.IsObject()) {
@@ -430,6 +438,7 @@ bool RenderAgent::bake_atlas(const std::string& atlas_name, const std::vector<st
     const int array_size = texture_names.size();
     std::vector<SDL_Texture*> textures = std::vector<SDL_Texture*>((size_t)array_size, nullptr);
     std::vector<TextureConstructor*> constructors = std::vector<TextureConstructor*>((size_t)array_size, nullptr);
+    std::vector<bool> owned = std::vector<bool>((size_t)array_size, false);
     int atlas_size = RENDER_SETTINGS["texture_atlas_size"].get<int>();
     if (!insert_texture(atlas_name, RenderAgentTexture{nullptr, atlas_size}))
         return false;
@@ -445,6 +454,7 @@ bool RenderAgent::bake_atlas(const std::string& atlas_name, const std::vector<st
         RenderAgentTexture* tmp_texture = get_texture(texture_names[i], true);
         if (!tmp_texture) {
             textures[i] = load_texture(texture_names[i]);
+            owned[i] = true;
             if (!textures[i])
                 LOG(LogLevel::Warning, "Could not load texture while baking atlas; skipping.");
         } else {
@@ -455,9 +465,8 @@ bool RenderAgent::bake_atlas(const std::string& atlas_name, const std::vector<st
     // Finding positions
     LOG(LogLevel::Debug, "Finding positions..");
     for (int i = 0; i < array_size; ++i) {
-        if (!textures[i])
-            continue;
-        find_atlas_pos(atlas, textures[i], constructors[i]);
+        if (textures[i])
+            find_atlas_pos(atlas, textures[i], constructors[i]);
     }
     LOG(LogLevel::Debug, "Done finding positions!");
 
@@ -477,9 +486,13 @@ bool RenderAgent::bake_atlas(const std::string& atlas_name, const std::vector<st
     // Saving
     if (DEBUG["save_texture_atlases"].get<bool>()) {
         if (RENDER_SETTINGS["render_mode"].get<int>() == 1) {
-            SDL_SetRenderTarget(renderer, atlas->texture);
+            if (!SDL_SetRenderTarget(renderer, atlas->texture))
+                LOG(LogLevel::Warning, "Could not save atlas \"%s\": could not set render target: %s", atlas_name.c_str(), SDL_GetError());
             SDL_Surface* save_surface = SDL_RenderReadPixels(renderer, NULL);
-            SDL_SetRenderTarget(renderer, nullptr);
+            if (!save_surface)
+                LOG(LogLevel::Warning, "Could not save atlas \"%s\": could not create save surface: %s", atlas_name.c_str(), SDL_GetError());
+            if (!SDL_SetRenderTarget(renderer, nullptr))
+                LOG(LogLevel::Warning, "Could not save atlas \"%s\": could not set render target: %s", atlas_name.c_str(), SDL_GetError());
             const std::filesystem::path atlas_file_path = LOCATIONS["log_dir"].get<std::filesystem::path>() / std::filesystem::path("atlas-'" + atlas_name + "'.png");
             const std::string atlas_file_path_str = atlas_file_path.u8string();
             LOG(LogLevel::Debug, "Saving Atlas \"%s\" to \"%s\".", atlas_name.c_str(), atlas_file_path_str.c_str());
@@ -490,7 +503,7 @@ bool RenderAgent::bake_atlas(const std::string& atlas_name, const std::vector<st
 
     // Cleanup
     for (int i = 0; i < array_size; ++i) {
-        if (textures[i])
+        if (textures[i] && owned[i])
             SDL_DestroyTexture(textures[i]);
     }
 
@@ -503,13 +516,15 @@ bool RenderAgent::add_to_atlas(const std::string& atlas_name, const std::string&
     if (!atlas)
         return false;
     std::vector<TextureConstructor*> constructors{2, nullptr};
+    bool owned = false;
     constructors[0] = new TextureConstructor{atlas_name, 0, 0};
     constructors[1] = new TextureConstructor{texture_name, -1, -1};
 
     SDL_Texture* texture = nullptr;
     RenderAgentTexture* tmp_texture = get_texture(texture_name, true);
-    if (!texture) {
+    if (!tmp_texture) {
         texture = load_texture(texture_name);
+        owned = true;
         if (!texture) {
             LOG(LogLevel::Warning, "Could not load texture while baking atlas; abording.");
             SDL_DestroyTexture(texture);
@@ -519,7 +534,7 @@ bool RenderAgent::add_to_atlas(const std::string& atlas_name, const std::string&
         texture = tmp_texture->texture;
     }
 
-    if (!texture)
+    if (texture)
         find_atlas_pos(atlas, texture, constructors[1]);
 
     std::string sprite_id = texture_name;
@@ -545,7 +560,8 @@ bool RenderAgent::add_to_atlas(const std::string& atlas_name, const std::string&
         }
     }
 
-    SDL_DestroyTexture(texture);
+    if (owned)
+        SDL_DestroyTexture(texture);
 
     return true;
 }
@@ -646,10 +662,10 @@ RenderAgentEntity* RenderAgent::add_entity(const std::string& sprite_id, const u
         return nullptr;
     }
     if (layer == -1) {
-        heighest_layer = heighest_layer+1;
-        entity.layer = heighest_layer;
+        highest_layer = highest_layer+1;
+        entity.layer = highest_layer;
     } else {
-        heighest_layer = std::max(heighest_layer, layer);
+        highest_layer = std::max(highest_layer, layer);
         entity.layer = layer;
     }
 
@@ -693,4 +709,26 @@ RenderAgentEntity* RenderAgent::get_entity(const int& x, const int& y, bool supp
     if (!suppress_logs)
         LOG(LogLevel::Warning, "Requested non-existent entity at %d x %d", x, y);
     return nullptr;
+}
+
+bool RenderAgent::delete_entity(RenderAgentEntity* entity) {
+    if (!entity)
+        return false;
+
+    agent_quadtree.remove(entity);
+
+    auto it = std::find_if(
+        agent_entitys.begin(),
+        agent_entitys.end(),
+        [entity](RenderAgentEntity& current) {
+            return &current == entity;
+        }
+    );
+
+    if (it != agent_entitys.end()) {
+        agent_entitys.erase(it);
+        entity = nullptr;
+        return true;
+    }
+    return false;
 }

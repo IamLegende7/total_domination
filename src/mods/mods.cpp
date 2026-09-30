@@ -1,8 +1,10 @@
 #include <SDL3/SDL_process.h>
 #include <SDL3/SDL_iostream.h>
 #include <SDL3/SDL_timer.h>
+#include <SDL3/SDL_stdinc.h>
 #include <string>
 #include <filesystem>
+#include <cstdint>
 
 #include "rapidjson/document.h"
 #include "rapidjson/rapidjson.h"
@@ -15,6 +17,36 @@
 #include "utils/logger.hpp"
 
 #include "settings/locations.hpp"
+
+int ModServerRequest::get_status() {
+    if (!data.IsObject())
+        return -200;
+    if (!data.HasMember("status"))
+        return -200;
+    if (!data["status"].IsInt())
+        return -200;
+    return data["status"].GetInt();
+}
+
+std::string ModServer::type_to_string(ModServerRequestType& type) {
+    switch (type) {
+        case ModServerRequestType::execute:  return "execute";
+        case ModServerRequestType::load_mod: return "load_mod";
+        case ModServerRequestType::status:   return "status";
+        case ModServerRequestType::response: return "response";
+        case ModServerRequestType::error:    return "error";
+        default:                             return "[Unknown ModServerRequestType]";
+    }
+}
+
+ModServerRequestType ModServer::string_to_type(std::string string) {
+    if (string == "execute")       return ModServerRequestType::execute;
+    else if (string == "load_mod") return ModServerRequestType::load_mod;
+    else if (string == "status")   return ModServerRequestType::status;
+    else if (string == "response") return ModServerRequestType::response;
+    else if (string == "error")    return ModServerRequestType::error;
+    else                           return ModServerRequestType::error;
+}
 
 ModServer::ModServer() {
     const std::filesystem::path server_path = LOCATIONS["mod_server_path"].get<std::filesystem::path>();
@@ -43,13 +75,55 @@ ModServer::~ModServer() {
         SDL_DestroyProcess(process);
 }
 
+// Tools //
+std::string ModServer::uuid4(){
+    uint8_t bytes[12];
+
+    for (size_t i = 0; i < 12; i += 4) {
+        uint32_t value = SDL_rand_bits();
+
+        bytes[i + 0] = static_cast<uint8_t>(value >> 24);
+        bytes[i + 1] = static_cast<uint8_t>(value >> 16);
+        bytes[i + 2] = static_cast<uint8_t>(value >> 8);
+        bytes[i + 3] = static_cast<uint8_t>(value);
+    }
+    bytes[6] = (bytes[6] & 0x0F) | 0x40;
+    bytes[8] = (bytes[8] & 0x3F) | 0x80;
+    char buffer[37];
+
+    std::snprintf(
+        buffer,
+        sizeof(buffer),
+        "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+        bytes[0],  bytes[1],  bytes[2],  bytes[3],
+        bytes[4],  bytes[5],
+        bytes[6],  bytes[7],
+        bytes[8],  bytes[9],
+        bytes[10], bytes[11], bytes[12], bytes[13],
+        bytes[14], bytes[15]
+    );
+
+    return std::string(buffer);
+}
+
 // Calls //
-void ModServer::make_request(ModServerRequest& request) {
+void ModServer::send_request(ModServerRequest& request) {
     rapidjson::Document request_json;
     request_json.SetObject();
+
+    rapidjson::Value uuid;
+    uuid.SetString(request.uuid.c_str(), request_json.GetAllocator());
     rapidjson::Value type;
-    type.SetString(request.type.c_str(), request_json.GetAllocator());
+    type.SetString(type_to_string(request.type).c_str(), request_json.GetAllocator());
+    rapidjson::Value origin;
+    if (request.origin)
+        origin.SetString("TDModServer", request_json.GetAllocator());
+    else
+        origin.SetString("TD", request_json.GetAllocator());
+
+    request_json.AddMember("id", uuid, request_json.GetAllocator());
     request_json.AddMember("type", type, request_json.GetAllocator());
+    request_json.AddMember("origin", origin, request_json.GetAllocator());
     request_json.AddMember("data", request.data, request_json.GetAllocator());
 
     rapidjson::StringBuffer buffer;
@@ -58,18 +132,24 @@ void ModServer::make_request(ModServerRequest& request) {
 
     std::string request_str = std::string(buffer.GetString())+"\n";
 
+    //LOG(LogLevel::Debug, "Sending request: %s", request_str.c_str());
     SDL_WriteIO(input, request_str.data(), request_str.size());
     SDL_FlushIO(input);
 }
 
-void ModServer::handle_function_request(ModServerResponse& function_request) {
-    rapidjson::Value& data = function_request.data;
+void ModServer::handle_function_request(ModServerRequest& request) {
+    rapidjson::Value& data = request.data;
     rapidjson::Value args(rapidjson::kArrayType);
     
-    ModServerRequest result = {"requested_function_response"};
+    ModServerRequest result = {request.uuid, ModServerRequestType::response};
     result.data.SetObject();
     rapidjson::Value status;
+    rapidjson::Value return_val;
     status.SetInt(1);
+    return_val.SetObject();
+    rapidjson::Document::AllocatorType allocator = result.data.GetAllocator();
+    result.data.AddMember("status", status, allocator);
+    result.data.AddMember("return", return_val, allocator);
 
     if (!data.IsObject()) {
         LOG(LogLevel::Error, "Could not process function: data is not an object.");
@@ -96,44 +176,35 @@ void ModServer::handle_function_request(ModServerResponse& function_request) {
         }
         if (!found) {
             LOG(LogLevel::Warning, "Requested function \"%s\" not found.", function_str.c_str());
-            status.SetInt(2);
-        } else
-            status.SetInt(0);
+            result.data["status"].SetInt(2);
+        }
     }
 
-    result.data.AddMember("status", status, result.data.GetAllocator());
-
-    rapidjson::Document request_json;
-    request_json.SetObject();
-    rapidjson::Value type;
-    type.SetString(result.type.c_str(), request_json.GetAllocator());
-    request_json.AddMember("type", type, request_json.GetAllocator());
-    request_json.AddMember("data", result.data, request_json.GetAllocator());
-
-    rapidjson::StringBuffer buffer;
-    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-    request_json.Accept(writer);
-
-    std::string request_str = std::string(buffer.GetString())+"\n";
-
-    SDL_WriteIO(input, request_str.data(), request_str.size());
-    SDL_FlushIO(input);
+    send_request(result);
 }
 
-ModServerResponse ModServer::get_response() {
+ModServerRequest ModServer::get_response() {
     bool stop_loop = false;
-    ModServerResponse response;
+    ModServerRequest response;
     while (!stop_loop) {    
         std::string output_str;
         char character = 0;
         while (character != '\n') {
             size_t n = SDL_ReadIO(output, &character, 1);
+            if (SDL_GetIOStatus(output) == SDL_IO_STATUS_EOF) {
+                LOG(LogLevel::Error, "Mod server closed its output stream.");
+                response.type = ModServerRequestType::error;
+                response.data.SetObject();
+                return response;
+            }
             if (n == 0) {
                 SDL_Delay(1);
                 continue;
             }
-            output_str.push_back(character);
+            if (character != '\n')
+                output_str.push_back(character);
         }
+        //LOG(LogLevel::Debug, "Recieved: \"%s\"", output_str.c_str());
 
         rapidjson::Document response_json;
         try {
@@ -151,32 +222,32 @@ ModServerResponse ModServer::get_response() {
             response_json.SetObject();
         }
         
-        response = {3, "Error loading response.", "TDModServerComunicator"};
+        response = {"00000000-0000-4000-0000-000000000000", ModServerRequestType::error, true};
         if (!response_json.IsObject()) {
             LOG(LogLevel::Error, "Could not load response: root is not an object.");
             stop_loop = true;
         } else if (
-            !response_json.HasMember("status") ||
-            !response_json.HasMember("message") ||
-            !response_json.HasMember("sender") ||
+            !response_json.HasMember("id") ||
+            !response_json.HasMember("type") ||
+            !response_json.HasMember("origin") ||
             !response_json.HasMember("data")
         ) {
-            LOG(LogLevel::Error, "Could not load response: is missing one or more of: [\"status\", \"message\", \"sender\", \"data\"].");
+            LOG(LogLevel::Error, "Could not load response: is missing one or more of: [\"id\", \"type\", \"origin\", \"data\"].");
             stop_loop = true;
         } else if (
-            !response_json["status"].IsInt() ||
-            !response_json["message"].IsString() ||
-            !response_json["sender"].IsString() ||
+            !response_json["id"].IsString() ||
+            !response_json["type"].IsString() ||
+            !response_json["origin"].IsString() ||
             !response_json["data"].IsObject()
         ) {
-            LOG(LogLevel::Error, "Could not load response: one or more keys are of incorrect type: [\"status\": int, \"message\": str, \"sender\": str, \"data\": dict].");
+            LOG(LogLevel::Error, "Could not load response: one or more keys are of incorrect type: [\"id\": str, \"type\": str, \"origin\": str, \"data\": dict].");
             stop_loop = true;
         } else {
-            response.status = response_json["status"].GetInt();
-            response.message = response_json["message"].GetString();
-            response.sender = response_json["sender"].GetString();
-            response.data = response_json["data"];
-            if (response.status == -1) {
+            response.uuid = response_json["id"].GetString();
+            response.type = string_to_type(std::string(response_json["type"].GetString()));
+            response.origin = (std::string(response_json["origin"].GetString()) == "TDModServer");
+            response.data.CopyFrom(response_json["data"], response_json.GetAllocator());
+            if (response.type == ModServerRequestType::execute) {
                 handle_function_request(response);
             } else {
                 stop_loop = true;
@@ -187,48 +258,39 @@ ModServerResponse ModServer::get_response() {
 }
 
 // API //
-ModServerResponse ModServer::status() {
-    ModServerRequest request = {
-        "status"
-    };
-    MOD_SERVER->make_request(request);
-    return MOD_SERVER->get_response();
+ModServerRequest ModServer::status() {
+    ModServerRequest request = {uuid4(), ModServerRequestType::status};
+    send_request(request);
+    return get_response();
 }
 
-ModServerResponse ModServer::execute(const std::string& mod, const std::string& function, rapidjson::Document& args) {
-    ModServerRequest request = {
-        "execute"
-    };
-    rapidjson::Value json_mod;
+ModServerRequest ModServer::execute(const std::string& function, rapidjson::Document& args) {
+    ModServerRequest request = {uuid4(), ModServerRequestType::execute};
     rapidjson::Value json_function;
     rapidjson::Value json_args;
 
     rapidjson::Document::AllocatorType& allocator = request.data.GetAllocator();
 
     request.data.SetObject();
-    json_mod.SetString(mod.c_str(), allocator);
     json_function.SetString(function.c_str(), allocator);
     json_args.CopyFrom(args, allocator);
 
-    request.data.AddMember("mod", json_mod, allocator);
     request.data.AddMember("function", json_function, allocator);
     request.data.AddMember("args", json_args, allocator);
     
-    MOD_SERVER->make_request(request);
-    return MOD_SERVER->get_response();
+    send_request(request);
+    return get_response();
 }
 
-ModServerResponse ModServer::load_mod(const std::filesystem::path& path) {
-    ModServerRequest request = {
-        "load_mod"
-    };
-    rapidjson::Value json_mod_path;
+ModServerRequest ModServer::load_mod(const std::filesystem::path& path) {
+    ModServerRequest request = {uuid4(), ModServerRequestType::load_mod};
+    rapidjson::Value json_path;
 
     request.data.SetObject();
-    json_mod_path.SetString(path.u8string().c_str(), request.data.GetAllocator());
+    json_path.SetString(path.u8string().c_str(), request.data.GetAllocator());
 
-    request.data.AddMember("mod_path", json_mod_path, request.data.GetAllocator());
+    request.data.AddMember("path", json_path, request.data.GetAllocator());
     
-    MOD_SERVER->make_request(request);
-    return MOD_SERVER->get_response();
+    send_request(request);
+    return get_response();
 }

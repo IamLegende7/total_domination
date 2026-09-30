@@ -157,11 +157,11 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
     // Mod Server //
     LOG(LogLevel::Info, "Starting ModServer..");
     MOD_SERVER = new ModServer();
-    ModServerResponse response = MOD_SERVER->load_mod(LOCATIONS["mod_dir"].get<std::filesystem::path>()/std::filesystem::path("td"));
-    if (response.status == 0) {
-        LOG(LogLevel::Info, "ModServer: Code %d: \"%s\"", response.status, response.message.c_str());
+    ModServerRequest response = MOD_SERVER->load_mod(LOCATIONS["mod_dir"].get<std::filesystem::path>()/std::filesystem::path("td"));
+    if (response.get_status() == 0) {
+        LOG(LogLevel::Info, "ModServer: Code %d", response.get_status());
     } else {
-        LOG(LogLevel::Critical, "Mod server connection could not be established: Code %d: \"%s\"", response.status, response.message.c_str());
+        LOG(LogLevel::Critical, "Mod server connection could not be established: Code %d", response.get_status());
         return SDL_APP_FAILURE;
     }
 
@@ -181,29 +181,28 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
         
         if (DEBUG["test_mod_server"].get<bool>()) {
             response = MOD_SERVER->status();
-            if (response.status == 0) {
-                LOG(LogLevel::Info, "Mod server reports: Code %d: \"%s\"", response.status, response.message.c_str());
+            if (response.get_status() == 0) {
+                LOG(LogLevel::Info, "Mod server reports: Code %d", response.get_status());
             } else {
-                LOG(LogLevel::Critical, "Mod server connection could not be established: Code %d: \"%s\"", response.status, response.message.c_str());
+                LOG(LogLevel::Critical, "Mod server connection could not be established: Code %d", response.get_status());
                 return SDL_APP_FAILURE;
             }
 
-            const std::string mod = "td";
-            const std::string function = "test_echo";
+            const std::string function = "td:test_echo";
 
             rapidjson::Document args(rapidjson::kArrayType);
             rapidjson::Value str_obj;
             str_obj.SetString("Test!", args.GetAllocator());
             args.PushBack(str_obj, args.GetAllocator());
 
-            response = MOD_SERVER->execute(mod, function, args);
-            if (response.status == 0) {
+            response = MOD_SERVER->execute(function, args);
+            if (response.get_status() == 0) {
                 rapidjson::StringBuffer buffer;
                 rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
                 response.data.Accept(writer);
-                LOG(LogLevel::Info, "Mod server reports: Code %d: \"%s\", data: %s", response.status, response.message.c_str(), buffer.GetString());
+                LOG(LogLevel::Info, "Mod server reports: Code %d, data: %s", response.get_status(), buffer.GetString());
             } else {
-                LOG(LogLevel::Error, "Mod server test failed: Code %d: \"%s\"", response.status, response.message.c_str());
+                LOG(LogLevel::Error, "Mod server test failed: Code %d", response.get_status());
             }
         }
 
@@ -214,7 +213,7 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
             LOG(LogLevel::Error,    "Testing Logger");
             LOG(LogLevel::Critical, "Testing Logger");
             rapidjson::Document args;
-            MOD_SERVER->execute("td", "test_logger", args);
+            MOD_SERVER->execute("td:test_logger", args);
         }
 
         if (DEBUG["print_locations"].get<bool>()) {

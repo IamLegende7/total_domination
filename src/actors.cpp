@@ -1,5 +1,6 @@
 #include <string>
 #include <filesystem>
+#include <vector>
 
 #include "actors.hpp"
 #include "map.hpp"
@@ -9,18 +10,44 @@
 
 #include "mods/mods.hpp"
 
-#include "utils/quadtree.hpp"
 #include "utils/logger.hpp"
 #include "utils/json.hpp"
 
 #include "settings/locations.hpp"
 
-ActorHandler::ActorHandler(RenderAgent* agent, RenderAgent* map_agent, const SDL_Color& player_colour, uint8_t player_num) {
+bool ActorHandler::execute_actor_function(ActorInstance* instance, const std::string& key) {
+    if (!instance || !instance->parent)
+        return false;
+
+    std::vector<ActorFunction> functions_to_execute;
+    auto it = instance->parent->functions.find(key);
+    if (it == instance->parent->functions.end()) {
+        return true;
+    }
+    functions_to_execute = it->second;
+    const std::string instance_id = instance->id;
+
+    for (auto& function : functions_to_execute) {
+        rapidjson::Document arguments(rapidjson::kArrayType);
+        rapidjson::Document::AllocatorType& allocator = arguments.GetAllocator();
+        rapidjson::Value arg0;
+        arg0.SetString(instance->id.c_str(), allocator);
+        arguments.PushBack(arg0, allocator);
+        for (rapidjson::SizeType i = 0; i < function.arguments.Size(); i++) {
+            rapidjson::Value arg;
+            arg.CopyFrom(function.arguments[i], allocator);
+            arguments.PushBack(arg, allocator);
+        }
+        ModServerRequest response = MOD_SERVER->execute(function.function, arguments);
+        if (response.get_status() != 0) {
+            LOG(LogLevel::Warning, "Could not execute \"%s\": Code: %d", function.function.c_str(), response.get_status());
+        }
+    }
+    return true;
+}
+
+ActorHandler::ActorHandler(RenderAgent* agent, const SDL_Color& player_colour, uint8_t player_num) {
     this->agent = agent;
-    this->map_agent = map_agent;
-    instances.set_capacity(16);
-    agent->agent_quadtree.set_dimensions(map_agent->agent_quadtree.x, map_agent->agent_quadtree.y, map_agent->agent_quadtree.width, map_agent->agent_quadtree.height);
-    instances.set_dimensions(map_agent->agent_quadtree.x, map_agent->agent_quadtree.y, map_agent->agent_quadtree.width, map_agent->agent_quadtree.height);
     this->player_colour = player_colour;
     this->player_num = player_num;
 }
@@ -132,40 +159,38 @@ Actor* ActorHandler::get_actor(const std::string& id, bool suppress_logs) {
     return nullptr;
 }
 
-bool ActorHandler::spawn_actor(const std::string& id, const int& col, const int& row) {
-    if (get_instance(col, row, true) != nullptr) {
+ActorInstance* ActorHandler::spawn_actor(const std::string& id, const int& col, const int& row) {
+    MapTile* tile = MAIN_MAP->get_tile(col, row);
+    if (tile == nullptr) {
+        LOG(LogLevel::Warning, "Could not spawn instance of actor \"%s\" at %d %d: tile does not exist.", id.c_str(), col, row);
+        return nullptr;
+    }
+    if (tile->actors[0] != nullptr) {
         LOG(LogLevel::Warning, "Could not spawn instance of actor \"%s\" at %d %d: an instance already exists at that tile.", id.c_str(), col, row);
-        return false;
+        return nullptr;
     }
     if (get_actor(id, true) == nullptr) {
         if (!load_actor(id)) {
             LOG(LogLevel::Warning, "Could not spawn instance of actor \"%s\" at %d %d: could not add actor.", id.c_str(), col, row);
-            return false;
+            return nullptr;
         }
     }
     Actor* parent = get_actor(id);
     if (!parent) {
         LOG(LogLevel::Warning, "Could not spawn instance of actor \"%s\" at %d %d: parent not loaded.", id.c_str(), col, row);
-        return false;
+        return nullptr;
     }
-    std::vector<ActorInstance*> all_instances;
     int instances_same_actor_count = 0;
-    instances.query_all(all_instances);
-    for (auto& entry : all_instances) {
-        if (entry->id == id)
+    for (auto& entry : instances) {
+        if (entry.id == id)
             instances_same_actor_count++;
     }
     const std::string entity_id = id + std::string("-") + std::to_string(instances_same_actor_count);
-    MapTile* tile = MAIN_MAP->get_tile(row, col);
-    if (tile == nullptr) {
-        LOG(LogLevel::Warning, "Could not spawn instance of actor \"%s\" at %d %d: tile does not exist.", id.c_str(), col, row);
-        return false;
-    }
 
     int x = (16*(col-row));
     int y = (11*(row+col)-(16*(tile->height-1)))-11;
-    int layer = ((MAIN_MAP->cols-1)*row) + (col);
-    RenderAgentEntity* entity = agent->add_entity(parent->sprite, 0, x, y, layer);
+    int layer = ((MAIN_MAP->cols-1)*row) + (col) + 1;
+    RenderAgentEntity* entity = agent->add_entity(parent->sprite, 0, x, y, layer, 0, (parent->movement_speed > 0), true);
     ActorInstance instance = {
         entity_id,
         parent,
@@ -178,27 +203,27 @@ bool ActorHandler::spawn_actor(const std::string& id, const int& col, const int&
         col,
         row
     };
-    int max_depth = -1;
-    if (instance.movement_speed > 0)
-        max_depth = 0;
-    instances.insert(entity_id, instance, max_depth, true);
+    instances.push_back(instance);
+
+    execute_actor_function(&instances.back(), "spawn");
+    
     //LOG(LogLevel::Debug, "Spawned instance of \"%s\" at %d %d. Length is now: %d", id.c_str(), col, row, all_instances.size());
     agent->set_dirty();
-    return true;
+    return &instances.back();
 }
 
 bool ActorHandler::delete_instance(const std::string& id) {
-    std::vector<ActorInstance*> actors;
-    instances.query_by_id(id, actors);
-    instances.delete_entries(actors);
+    int index = get_instance_index(id);
+    if (index >= 0)
+        instances.erase(instances.begin() + index);
     return true;
 }
 
 ActorInstance* ActorHandler::get_instance(const std::string& id, bool suppress_logs) {
-    std::vector<ActorInstance*> result;
-    instances.query_by_id(id, result);
-    if (result.size() > 0) {
-        return result[0];
+    for (auto& instance : instances) {
+        if (instance.id == id) {
+            return &instance;
+        }
     }
 
     if (!suppress_logs)
@@ -206,56 +231,23 @@ ActorInstance* ActorHandler::get_instance(const std::string& id, bool suppress_l
     return nullptr;
 }
 
-ActorInstance* ActorHandler::get_instance(const int& col, const int& row, bool suppress_logs) {
-    std::vector<ActorInstance*> result;
-    instances.query_all(result);
-    if (result.size() > 0) {
-        for (ActorInstance* instance : result) {
-            if (
-                (instance->x == col) &&
-                (instance->y == row)
-            )
-            return instance;
+int ActorHandler::get_instance_index(const std::string& id, bool suppress_logs) {
+    int index = 0;
+    for (auto& instance : instances) {
+        if (instance.id == id) {
+            return index;
         }
+        index++;
     }
 
     if (!suppress_logs)
-        LOG(LogLevel::Warning, "Requested non-existent instance at %d %d", col, row);
-    return nullptr;
+        LOG(LogLevel::Warning, "Requested non-existent instance with id \"%s\"", id);
+    return -1;
 }
 
 bool ActorHandler::round() {
-    std::vector<ActorInstance*> all_instances;
-    instances.query_all(all_instances);
-    for (auto& instance : all_instances) {
-        for (auto& [key, value] : instance->parent->functions) {
-            if (key == "round") {
-                for (auto& function : value) {
-                    const std::size_t sep = function.function.find(':');
-                    std::string mod = ""; 
-                    std::string func = "";
-                    if (sep != std::string::npos) {
-                        mod = function.function.substr(0, sep);
-                        func = function.function.substr(sep+1);
-                    }
-                    rapidjson::Document arguments(rapidjson::kArrayType);
-                    rapidjson::Document::AllocatorType& allocator = arguments.GetAllocator();
-                    rapidjson::Value arg0;
-                    arg0.SetString(instance->id.c_str(), allocator);
-                    arguments.PushBack(arg0, allocator);
-                    for (rapidjson::SizeType i = 0; i < function.arguments.Size(); i++) {
-                        rapidjson::Value arg;
-                        arg.CopyFrom(function.arguments[i], allocator);
-                        arguments.PushBack(arg, allocator);
-                    }
-                    ModServerResponse response = MOD_SERVER->execute(mod, func, arguments);
-                    if (response.status != 0) {
-                        LOG(LogLevel::Warning, "Could not execute \"%s\": Code: %d: \"%s\"", function.function.c_str(), response.status, response.message.c_str());
-                    }
-                }
-                break;
-            }
-        }
+    for (auto& instance : instances) {
+        execute_actor_function(&instance, "round");
     }
     return true;
 }

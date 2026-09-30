@@ -13,6 +13,9 @@ inline void init_main_settings(const std::filesystem::path& config_file) {
     SETTINGS["font"] =                 Setting(replace_locations(load_setting<std::filesystem::path>(config_file, "Misc", "font", "$resource_dir$/fonts/RobotoMono-Regular.ttf")));
     SETTINGS["font_size"] =            Setting(load_setting<int>(config_file, "Misc", "font_size", 50));
     SETTINGS["initial_camera_zoom"] =  Setting(load_setting<int>(config_file, "Misc", "initial_camera_zoom", 5));
+    // MapLoading //
+    SETTINGS["loading_type"] =         Setting(load_setting<int>(config_file, "MapLoading", "loading_type", 1));
+    SETTINGS["render_distance"] =      Setting(load_setting<int>(config_file, "MapLoading", "render_distance", -1));
     // Ticking //
     SETTINGS["max_frame_rate"] =       Setting(load_setting<int>(config_file, "Ticking", "max_frame_rate", 60));
     SETTINGS["tick_rate"] =            Setting(load_setting<int>(config_file, "Ticking", "tick_rate", 20));

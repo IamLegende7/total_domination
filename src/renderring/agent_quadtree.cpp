@@ -2,11 +2,20 @@
 #include <SDL3/SDL_pixels.h>
 #include <vector>
 #include <string>
-#include <vector>
+#include <algorithm>
 #include <cmath>
 
 #include "renderring/render_agent.hpp"
 #include "utils/logger.hpp"
+
+RenderAgentQuadtreeNode::~RenderAgentQuadtreeNode() {
+    if (children[0]) {
+        for (int i = 0; i < 4; ++i) {
+            delete children[i];
+            children[i] = nullptr;
+        }
+    }
+}
 
 void RenderAgentQuadtreeNode::set_dimensions(int x, int y, int width, int height) {
     this->x = x;
@@ -77,6 +86,28 @@ bool RenderAgentQuadtreeNode::insert(RenderAgentEntity* entity, const bool allow
             contents.push_back(entity);
     }
     return true;
+}
+
+bool RenderAgentQuadtreeNode::remove(RenderAgentEntity* entity) {
+    if (entity == nullptr)
+        return false;
+
+    bool removed = false;
+    size_t old_size = contents.size();
+
+    contents.erase(
+        std::remove(contents.begin(), contents.end(), entity),
+        contents.end()
+    );
+    removed = contents.size() != old_size;
+
+    if (children[0]) {
+        for (int i = 0; i < 4; ++i) {
+            removed = children[i]->remove(entity) || removed;
+        }
+    }
+
+    return removed;
 }
 
 bool RenderAgentQuadtreeNode::query(const int target_x, const int target_y, const int target_width, const int target_height, std::vector<RenderAgentEntity*>& result) {

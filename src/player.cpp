@@ -11,7 +11,7 @@ Player::Player(const int& number, const std::string& name, const std::string& fa
     this->number = number;
     this->name = name;
     this->faction = faction;
-    actor_handler = new ActorHandler(ACTORS_RENDER_AGENT, MAIN_RENDER_AGENT, colour, number);
+    actor_handler = new ActorHandler(ACTORS_RENDER_AGENT, colour, number);
     for (auto& [key, value] : REGISTRY->get_category("resources")) {
         resources[key] = 0;
     }

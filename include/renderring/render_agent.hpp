@@ -59,20 +59,21 @@ class RenderAgentQuadtreeNode {
         RenderAgentQuadtreeNode* children[4] = {nullptr, nullptr, nullptr, nullptr};
     
     public:
-        int x, y;
-        int width, height;
+        int x = 0, y = 0;
+        int width = 0, height = 0;
         int node_capacity = 16;
         uint8_t depth = 0;
 
         RenderAgentQuadtreeNode(): x(0), y(0), width(0), height(0), node_capacity(0), depth(0) {};
         RenderAgentQuadtreeNode(const int x, const int y, const int width, const int height, const int node_capacity, const int depth=0): x(x), y(y), width(width), height(height), node_capacity(node_capacity), depth(depth) {};
-        ~RenderAgentQuadtreeNode() {};
+        ~RenderAgentQuadtreeNode();
 
         void set_dimensions(int x, int y, int width, int height);
         void set_capacity(const int node_capacity);
 
         bool subdivide();
         bool insert(RenderAgentEntity* entity, const bool allow_subdivision = true);
+        bool remove(RenderAgentEntity* entity);
         bool query(const int target_x, const int target_y, const int target_width, const int target_height, std::vector<RenderAgentEntity*>& result);
         bool render(SDL_Renderer* renderer, const int x_offset, const int y_offset, const int zoom, const int resolution, const SDL_Color& colour={200, 30, 210, 255});
 };
@@ -84,6 +85,7 @@ class RenderAgent {
 
         std::unordered_map<std::string, RenderAgentTexture> agent_textures;
         std::unordered_map<std::string, RenderAgentSprite> agent_sprites;
+        RenderAgentQuadtreeNode agent_quadtree;
         std::deque<RenderAgentEntity> agent_entitys;
 
         TTF_TextEngine* text_engine = nullptr;
@@ -92,8 +94,7 @@ class RenderAgent {
     
         bool dirty[animation_frames_count] = {true};
     public:
-        RenderAgentQuadtreeNode agent_quadtree;
-        int heighest_layer = -1;
+        int highest_layer = -1;
 
         RenderAgent(SDL_Renderer* renderer, bool allow_text = false);
         ~RenderAgent();
@@ -104,6 +105,7 @@ class RenderAgent {
         RenderAgent& operator=(RenderAgent&&) = delete;
 
         void set_dimensions(const int& x, const int& y, const int& width, const int& height);
+        void get_dimensions(int& x_out, int& y_out, int& w_out, int& h_out);
         
         bool render(const int zoom=0, const int x_offset=0, const int y_offset=0, const bool clear_renderer=true, const int resolution=1, SDL_Color clear_colour={26, 26, 26, 255});
         void render_target();
@@ -137,6 +139,7 @@ class RenderAgent {
         RenderAgentEntity* insert_entity(RenderAgentEntity& entity, bool allow_subdivision = true);
         bool trigger_subdivision();
         RenderAgentEntity* get_entity(const int& x, const int& y, bool suppress_logs = false);
+        bool delete_entity(RenderAgentEntity* entity);
 
         // Text
         TTF_Font* get_font(const std::string& font_name, bool suppress_logs = false);

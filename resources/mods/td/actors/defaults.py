@@ -10,7 +10,11 @@ def produce_item(mod, instance_id: str, item_id: str) -> int:
 def spawn_palace(mod, instance_id: str) -> int:
     x, y = api.get_pos(instance_id)
     owner = api.get_owner(instance_id)
+    if owner == -1:
+        return 1
     faction = api.get_faction(owner)
+    if faction is None:
+        return 1
 
     api.delete_actor(instance_id)
     return api.spawn_actor(f"{faction}_palace", owner, x, y)

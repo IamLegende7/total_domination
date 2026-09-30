@@ -1,5 +1,6 @@
 {
     // Note: there is no actual diffrence between buildings and units, buildings just have a movement speed of 0
     "td:industrial_lumberjack": "$actor_dir$/buildings/industrial_lumberjack.jsonc",
-    "td:human_palace": "$actor_dir$/buildings/human_palace.jsonc"
+    "td:human_palace": "$actor_dir$/buildings/human_palace.jsonc",
+    "td:palace_placeholder": "$actor_dir$/buildings/palace_placeholder.jsonc"
 }

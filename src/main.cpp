@@ -8,6 +8,7 @@
 #include <cmath>
 #include <string>
 #include <filesystem>
+#include <cstdint>
 
 #include "callback_functions.hpp"
 
@@ -114,7 +115,34 @@ SDL_AppResult SDL_AppIterate(void* appState) {
             } else {
                 // map loading:
                 // TODO: move to dedecated function
+                PLAYERS.push_back(Player(0, "Developer", "td:human", {0, 255, 255, 255}));
+                PLAYERS.push_back(Player(1, "Computer "+std::to_string(1), "td:human", {255, 0, 0, 255}));
+                CURRENT_PLAYER = 0;
+                THIS_PLAYER = 0;
+                
+                //-// MAP LOADING //-//
+                LOG(LogLevel::Info, "Loading map \"%s\"", replace_locations(DEBUG["force_load_map"].get<std::filesystem::path>()).u8string().c_str());
+                Uint64 load_start_time = SDL_GetPerformanceCounter();
+                Uint64 preformance_frequency = SDL_GetPerformanceFrequency();
+
                 MAIN_MAP = new Map(MAIN_RENDER_AGENT, DEBUG["force_load_map"].get<std::filesystem::path>());
+
+                // Load Initial chunks
+                std::vector<std::tuple<int, int>> initial_chunks;
+                if (SETTINGS["loading_type"].get<int>() == 0) {
+                    for (int y = 0; y < int(MAIN_MAP->rows); ++y) {
+                        for (int x = 0; x < int(MAIN_MAP->cols); ++x) {
+                            initial_chunks.push_back(std::tuple<int, int>(x, y));
+                        }
+                    }
+                } else if (SETTINGS["loading_type"].get<int>() == 1) {
+
+                }
+                MAIN_MAP->load_chunks(initial_chunks);
+
+                Uint64 elapsed_ticks = SDL_GetPerformanceCounter() - load_start_time;
+                double elapsed_ms = (elapsed_ticks / (double)preformance_frequency) * 1000.0;
+                LOG(LogLevel::Info, "Loaded Map \"%s\" in %f ms", MAIN_MAP->name.c_str(), elapsed_ms);
 
                 CAMERA.zoom = SETTINGS["initial_camera_zoom"].get<int>();
                 int y = 20;
@@ -126,53 +154,35 @@ SDL_AppResult SDL_AppIterate(void* appState) {
                     UI_RENDER_AGENT->add_text("TPS", "TPS: --", "def_font", 20, y);
                     y += 60;
                 }
+                
                 if ((SETTINGS["input_mode"].get<int>() == 0) || (SETTINGS["input_mode"].get<int>() == 4)) {
                     // Change to palace actor pos
                     TILE_SELECTION_X = 0;
                     TILE_SELECTION_Y = 0;
                     std::vector<std::string> atlas_ui_textures = {
-                        "td:selected_tile_top",
-                        "td:selected_tile_left",
-                        "td:selected_tile_right"
+                        "td:selected_tile"
                     };
-                    MAIN_RENDER_AGENT->bake_atlas("atlas:ui", atlas_ui_textures);
+                    ACTORS_RENDER_AGENT->bake_atlas("atlas:ui", atlas_ui_textures);
                     MapTile* selected_tile = MAIN_MAP->get_tile(TILE_SELECTION_Y, TILE_SELECTION_X);
                     const int selected_tile_x = (16*(selected_tile->x-selected_tile->y));
                     const int selected_tile_y = (11*(selected_tile->x+selected_tile->y)-(16*(selected_tile->height-1)));
-                    const auto [surrounding_height_top, surrounding_height_bottom, surrounding_height_left, surrounding_height_right] = MAIN_MAP->get_surrounding(TILE_SELECTION_Y, TILE_SELECTION_X);
-                    const bool hide_left = (selected_tile->height <= surrounding_height_bottom);
-                    const bool hide_right = (selected_tile->height <= surrounding_height_right);
-                    selected_tile_top = MAIN_RENDER_AGENT->add_entity("td:selected_tile_top", 0, selected_tile_x, selected_tile_y, -1, 0, true, true);
-                    if (!selected_tile_top)
-                        LOG(LogLevel::Error, "Could not add tile \"selected_tile_top\"");
-                    selected_tile_left = MAIN_RENDER_AGENT->add_entity("td:selected_tile_left", 0, selected_tile_x, selected_tile_y, -1, 0, true, true);
-                    if (!selected_tile_left)
-                        LOG(LogLevel::Error, "Could not add tile \"selected_tile_left\"");
-                    selected_tile_right = MAIN_RENDER_AGENT->add_entity("td:selected_tile_right", 0, selected_tile_x, selected_tile_y, -1, 0, true, true);
-                    if (!selected_tile_right)
-                        LOG(LogLevel::Error, "Could not add tile \"selected_tile_right\"");
-                    
-                    if ((selected_tile_left != nullptr) && hide_left) {
-                        selected_tile_left->x = -10000;
-                        selected_tile_left->y = -10000;
-                    }
-                    if ((selected_tile_right != nullptr) && hide_right) {
-                        selected_tile_right->x = -10000;
-                        selected_tile_right->y = -10000;
-                    }
+                    const auto [surrounding_height_top, surrounding_height_bottom, surrounding_height_left, surrounding_height_right] = MAIN_MAP->get_surrounding(TILE_SELECTION_X, TILE_SELECTION_Y);
+                    uint8_t animation = 0;
+                    if (selected_tile->height > surrounding_height_bottom)
+                        animation += 1;
+                    if (selected_tile->height > surrounding_height_right)
+                        animation += 2;
+                    selected_tile_indicator = ACTORS_RENDER_AGENT->add_entity("td:selected_tile", animation, selected_tile_x, selected_tile_y, 0, 0, true, true);
+                    if (!selected_tile_indicator)
+                        LOG(LogLevel::Error, "Could not add tile \"selected_tile_indicator\"");
 
-                    if (selected_tile_top != nullptr) {
-                        SDL_Rect& selected_tile_top_rect = selected_tile_top->sprite->animations[0].texture_rects[0];
-                        CAMERA.x = (selected_tile_top->x+(int)(selected_tile_top_rect.w/2))-(int)((SCREEN_WIDTH/2)/CAMERA.zoom);
-                        CAMERA.y = (selected_tile_top->y+(int)(selected_tile_top_rect.h/2))-(int)((SCREEN_HEIGHT/2)/CAMERA.zoom);
+                    if (selected_tile_indicator != nullptr) {
+                        SDL_Rect& selected_tile_rect = selected_tile_indicator->sprite->animations[0].texture_rects[0];
+                        CAMERA.x = (selected_tile_indicator->x+(int)(selected_tile_rect.w/2))-(int)((SCREEN_WIDTH/2)/CAMERA.zoom);
+                        CAMERA.y = (selected_tile_indicator->y+(int)(selected_tile_rect.h/2))-(int)((SCREEN_HEIGHT/2)/CAMERA.zoom);
                     }
                 }
 
-                PLAYERS.push_back(Player(0, "Developer", "td:human", {0, 255, 255, 255}));
-                PLAYERS.push_back(Player(1, "Computer "+std::to_string(1), "td:human", {255, 0, 0, 255}));
-
-                CURRENT_PLAYER = 0;
-                THIS_PLAYER = 0;
                 ROUND = 0;
                 last_round = 0;
 
