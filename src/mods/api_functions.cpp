@@ -301,7 +301,7 @@ void ModServerFunctions::registry_get(rapidjson::Value& args, rapidjson::Documen
             output["status"].SetInt(0);
         }
         rapidjson::Document::AllocatorType& allocator = output.GetAllocator();
-        value.SetString(result.c_str(), allocator);
+        value.SetString(result.u8string().c_str(), allocator);
         output["return"].AddMember("value", value, allocator);
     }
 }

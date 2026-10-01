@@ -14,6 +14,10 @@
 #include <string>
 #include <filesystem>
 
+#ifdef WIN32
+    #include <windows.h>
+#endif
+
 #include "callback_functions.hpp"
 
 #include "main.hpp"
@@ -40,6 +44,16 @@ bool load_settings() {
 }
 
 SDL_AppResult init(void** appState, int argc, char** argv) {
+    // Configure windows to allow for ansi colours to be displayed
+    #ifdef WIN32
+        HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+        DWORD mode = 0;
+        if (GetConsoleMode(hOut, &mode)) {
+            mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+            SetConsoleMode(hOut, mode);
+        }
+    #endif
+
     // APP METADATA //
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, INFO_NAME.c_str());
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_VERSION_STRING, INFO_VERSION.toString().c_str());

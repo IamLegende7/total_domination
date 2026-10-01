@@ -2,6 +2,8 @@
 import sys, json
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 from logger import log, LogLevel, init_logger
 
 from api.internal import parse_line, handle_request

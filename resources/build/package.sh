@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 cd "$(dirname "$0")"
 cd ..
 
@@ -44,10 +46,15 @@ while true; do
     esac
 done
 
+# censor & strip
+rm -f data/logs/*.log
+rm -f data/logs/*.png
+rm -f data/logs/crashes/*
+rm -f resources/maps/testing/benchmark*.jsonc
+
 if [ -d "$package_dir" ]; then 
   rm -r "$package_dir"
 fi
-
 mkdir "$package_dir"
 
 if [ "$windows" = false ]; then
@@ -86,7 +93,7 @@ fi
 if [ "$do_cleanup" = true ]; then
     echo "Cleaning up.."
     rm -rf "$package_dir"
-fi
+fi 
 
 if [ "$delete_source" = true ]; then
     echo "Deleting compiled source.."

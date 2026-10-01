@@ -17,6 +17,7 @@
 #include "utils/logger.hpp"
 
 #include "settings/locations.hpp"
+#include "settings/main.hpp"
 
 int ModServerRequest::get_status() {
     if (!data.IsObject())
@@ -49,10 +50,23 @@ ModServerRequestType ModServer::string_to_type(std::string string) {
 }
 
 ModServer::ModServer() {
-    const std::filesystem::path server_path = LOCATIONS["mod_server_path"].get<std::filesystem::path>();
+    const std::filesystem::path server_path = SETTINGS["mod_server_path"].get<std::filesystem::path>();
     const std::string server_path_str = server_path.u8string();
     const std::string server_log_file_str = (LOCATIONS["log_dir"].get<std::filesystem::path>() / std::filesystem::path("mods.log")).u8string();
-    const char* args[] = {"python3", server_path_str.c_str(), server_log_file_str.c_str(), nullptr};
+    std::filesystem::path python_executable_path = SETTINGS["python_executable"].get<std::filesystem::path>();
+    if (python_executable_path == std::filesystem::path("default") || !std::filesystem::exists(python_executable_path))
+        #ifdef WIN32
+            python_executable_path = LOCATIONS["shipped_python"].get<std::filesystem::path>() / std::filesystem::path("python.exe");
+        #else
+            python_executable_path = LOCATIONS["shipped_python"].get<std::filesystem::path>() / std::filesystem::path("bin/python");
+        #endif
+    if (!std::filesystem::exists(python_executable_path)) {
+        LOG(LogLevel::Critical, "Python path is not valid: \"%s\"", python_executable_path.u8string().c_str());
+        return;
+    }
+    const std::string python_executable_path_str = python_executable_path.u8string();
+    const char* args[] = {python_executable_path_str.c_str(), server_path_str.c_str(), server_log_file_str.c_str(), nullptr};
+    LOG(LogLevel::Debug, "Executing %s %s %s", args[0], args[1], args[2]);
     process = SDL_CreateProcess(args, true);
     if (!process) {
         LOG(LogLevel::Error, "Could not create mod server process: %s", SDL_GetError());

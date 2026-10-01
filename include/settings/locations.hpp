@@ -39,25 +39,25 @@ inline void init_locations_settings(const std::filesystem::path& config_file) {
     LOCATIONS["base"] =                 Setting(std::filesystem::path(SDL_GetBasePath()));
     LOCATIONS["cwd"] =                  Setting(std::filesystem::path(SDL_GetCurrentDirectory()));
     // Main dirs //
-    LOCATIONS["data_dir"] =             Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Main dirs", "data_dir")));
-    LOCATIONS["config_dir"] =           Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Main dirs", "config_dir")));
-    LOCATIONS["resource_dir"] =         Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Main dirs", "resource_dir")));
+    LOCATIONS["data_dir"] =             Setting(replace_locations(load_setting<std::filesystem::path>(config_file, "Main dirs", "data_dir")));
+    LOCATIONS["config_dir"] =           Setting(replace_locations(load_setting<std::filesystem::path>(config_file, "Main dirs", "config_dir")));
+    LOCATIONS["resource_dir"] =         Setting(replace_locations(load_setting<std::filesystem::path>(config_file, "Main dirs", "resource_dir")));
     // Maps //
-    LOCATIONS["map_dir"] =              Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Maps", "map_dir")));
+    LOCATIONS["map_dir"] =              Setting(replace_locations(load_setting<std::filesystem::path>(config_file, "Maps", "map_dir")));
     // Textures //
-    LOCATIONS["texture_dir"] =          Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Textures", "texture_dir")));
-    LOCATIONS["texturepack_dir"] =      Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Textures", "texturepack_dir")));
-    LOCATIONS["missing_texture"] =      Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Textures", "missing_texture")));
-    LOCATIONS["missing_texture"] =      Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Textures", "missing_texture_tile")));
+    LOCATIONS["texture_dir"] =          Setting(replace_locations(load_setting<std::filesystem::path>(config_file, "Textures", "texture_dir")));
+    LOCATIONS["texturepack_dir"] =      Setting(replace_locations(load_setting<std::filesystem::path>(config_file, "Textures", "texturepack_dir")));
+    LOCATIONS["missing_texture"] =      Setting(replace_locations(load_setting<std::filesystem::path>(config_file, "Textures", "missing_texture")));
+    LOCATIONS["missing_texture"] =      Setting(replace_locations(load_setting<std::filesystem::path>(config_file, "Textures", "missing_texture_tile")));
     // Logging //
-    LOCATIONS["log_dir"] =              Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Logging", "log_dir")));
-    LOCATIONS["log_file"] =             Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Logging", "log_file")));
-    LOCATIONS["log_crash_dir"] =        Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Logging", "log_crash_dir")));
+    LOCATIONS["log_dir"] =              Setting(replace_locations(load_setting<std::filesystem::path>(config_file, "Logging", "log_dir")));
+    LOCATIONS["log_file"] =             Setting(replace_locations(load_setting<std::filesystem::path>(config_file, "Logging", "log_file")));
+    LOCATIONS["log_crash_dir"] =        Setting(replace_locations(load_setting<std::filesystem::path>(config_file, "Logging", "log_crash_dir")));
     // Mods //
-    LOCATIONS["mod_dir"] =              Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Mods", "mod_dir")));
-    LOCATIONS["mod_server_path"] =      Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Mods", "mod_server_path")));
+    LOCATIONS["shipped_python"] =       Setting(replace_locations(load_setting<std::filesystem::path>(config_file, "Mods", "shipped_python")));
+    LOCATIONS["mod_dir"] =              Setting(replace_locations(load_setting<std::filesystem::path>(config_file, "Mods", "mod_dir")));
     // Actors //
-    LOCATIONS["actor_dir"] =            Setting(replace_locations(load_setting<std::filesystem::path>(config_file.u8string(), "Actors", "actor_dir")));
+    LOCATIONS["actor_dir"] =            Setting(replace_locations(load_setting<std::filesystem::path>(config_file, "Actors", "actor_dir")));
 }
 
 #endif

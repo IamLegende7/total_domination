@@ -1,6 +1,7 @@
 # Builds
 bin/*
 build/*
+resources/python/*
 
 # Packaging
 total_domination-linux

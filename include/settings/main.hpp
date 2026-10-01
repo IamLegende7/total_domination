@@ -16,6 +16,9 @@ inline void init_main_settings(const std::filesystem::path& config_file) {
     // MapLoading //
     SETTINGS["loading_type"] =         Setting(load_setting<int>(config_file, "MapLoading", "loading_type", 1));
     SETTINGS["render_distance"] =      Setting(load_setting<int>(config_file, "MapLoading", "render_distance", -1));
+    // ModServer //
+    SETTINGS["python_executable"] =    Setting(replace_locations(load_setting<std::filesystem::path>(config_file, "ModServer", "python_executable")));
+    SETTINGS["mod_server_path"] =      Setting(replace_locations(load_setting<std::filesystem::path>(config_file, "ModServer", "mod_server_path", "$resource_dir$/mod_server/server.py")));
     // Ticking //
     SETTINGS["max_frame_rate"] =       Setting(load_setting<int>(config_file, "Ticking", "max_frame_rate", 60));
     SETTINGS["tick_rate"] =            Setting(load_setting<int>(config_file, "Ticking", "tick_rate", 20));

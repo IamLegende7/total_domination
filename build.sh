@@ -188,6 +188,25 @@ if [ "$compile_shaders" = true ]; then
     echo "Shaders successfully compiled!"
 fi
 
+## Venv
+if [ "$do_clean_build" = true ]; then
+    if [ ! -d "resources/python" ]; then
+        rm -rf resources/python
+    fi
+fi
+if [ -d "resources/python" ]; then
+    echo "Building python.."
+    PYTHON_VERSION="3.14.7"
+    mkdir -p resources/python
+    if [ "$compile_for_windows" = false ]; then
+        ./resources/build/get_python_standalone.sh $PYTHON_VERSION resources/python
+    else
+        wget https://www.python.org/ftp/python/$PYTHON_VERSION/python-$PYTHON_VERSION-embed-amd64.zip
+        unzip python-$PYTHON_VERSION-embed-amd64.zip -d resources/python
+        rm -f python-$PYTHON_VERSION-embed-amd64.zip
+    fi
+fi
+
 ## Packaging
 if [ "$auto_package" = true ]; then
     echo "Packaging sentinel.."
