@@ -1,3 +1,4 @@
+#include <SDL3/SDL_stdinc.h>
 #include <string>
 #include <filesystem>
 #include <vector>
@@ -46,7 +47,7 @@ bool ActorHandler::execute_actor_function(ActorInstance* instance, const std::st
     return true;
 }
 
-ActorHandler::ActorHandler(RenderAgent* agent, const SDL_Color& player_colour, uint8_t player_num) {
+ActorHandler::ActorHandler(RenderAgent* agent, const SDL_Color& player_colour, Uint8 player_num) {
     this->agent = agent;
     this->player_colour = player_colour;
     this->player_num = player_num;
@@ -159,13 +160,13 @@ Actor* ActorHandler::get_actor(const std::string& id, bool suppress_logs) {
     return nullptr;
 }
 
-ActorInstance* ActorHandler::spawn_actor(const std::string& id, const int& col, const int& row) {
+ActorInstance* ActorHandler::spawn_actor(const std::string& id, const int& col, const int& row, const bool ignore_occupied) {
     MapTile* tile = MAIN_MAP->get_tile(col, row);
     if (tile == nullptr) {
         LOG(LogLevel::Warning, "Could not spawn instance of actor \"%s\" at %d %d: tile does not exist.", id.c_str(), col, row);
         return nullptr;
     }
-    if (tile->actors[0] != nullptr) {
+    if ((tile->actors.size() != 0) && !ignore_occupied) {
         LOG(LogLevel::Warning, "Could not spawn instance of actor \"%s\" at %d %d: an instance already exists at that tile.", id.c_str(), col, row);
         return nullptr;
     }
@@ -190,11 +191,37 @@ ActorInstance* ActorHandler::spawn_actor(const std::string& id, const int& col, 
     int x = (16*(col-row));
     int y = (11*(row+col)-(16*(tile->height-1)))-11;
     int layer = ((MAIN_MAP->cols-1)*row) + (col) + 1;
+    int quadtree_x, quadtree_y, quadtree_w, quadtree_h;
+    int w = agent->get_sprite(parent->sprite)->animations[0].texture_rects[0].w;
+    int h = agent->get_sprite(parent->sprite)->animations[0].texture_rects[0].h;
+    agent->get_dimensions(quadtree_x, quadtree_y, quadtree_w, quadtree_h);
+    if (x <= quadtree_x) {
+        LOG(LogLevel::Debug, "Adjusting Quadtree X..");
+        agent->set_dimensions(x, quadtree_y, (quadtree_x-x)+quadtree_w, quadtree_h);
+        agent->get_dimensions(quadtree_x, quadtree_y, quadtree_w, quadtree_h);
+    }
+    if (y <= quadtree_y) {
+        LOG(LogLevel::Debug, "Adjusting Quadtree Y..");
+        agent->set_dimensions(quadtree_x, y, quadtree_w, (quadtree_y-y)+quadtree_h);
+        agent->get_dimensions(quadtree_x, quadtree_y, quadtree_w, quadtree_h);
+    }
+    if (x+w >= quadtree_x+quadtree_w) {
+        LOG(LogLevel::Debug, "Adjusting Quadtree W..");
+        agent->set_dimensions(quadtree_x, quadtree_y, x+w-quadtree_x, quadtree_h);
+        agent->get_dimensions(quadtree_x, quadtree_y, quadtree_w, quadtree_h);
+    }
+    if (y+h >= quadtree_y+quadtree_h) {
+        LOG(LogLevel::Debug, "Adjusting Quadtree H..");
+        agent->set_dimensions(quadtree_x, quadtree_y, quadtree_w, y+h-quadtree_y);
+        agent->get_dimensions(quadtree_x, quadtree_y, quadtree_w, quadtree_h);
+    }
+    //LOG(LogLevel::Debug, "Dimensions: x: %d, y: %d, w: %d, h: %d", quadtree_x, quadtree_y, quadtree_w, quadtree_h);
     RenderAgentEntity* entity = agent->add_entity(parent->sprite, 0, x, y, layer, 0, (parent->movement_speed > 0), true);
     ActorInstance instance = {
         entity_id,
         parent,
         entity,
+        player_num,
         parent->max_hp,
         parent->max_hp,
         parent->movement_speed,
@@ -204,16 +231,23 @@ ActorInstance* ActorHandler::spawn_actor(const std::string& id, const int& col, 
         row
     };
     instances.push_back(instance);
+    tile->actors.push_back(&instances.back());
 
     execute_actor_function(&instances.back(), "spawn");
-    
-    //LOG(LogLevel::Debug, "Spawned instance of \"%s\" at %d %d. Length is now: %d", id.c_str(), col, row, all_instances.size());
+
+    LOG(LogLevel::Debug, "Spawned instance of \"%s\" at %d %d. Length is now: %d; Length of tile->actors: %d", id.c_str(), col, row, instances.size(), tile->actors.size());
     agent->set_dirty();
     return &instances.back();
 }
 
 bool ActorHandler::delete_instance(const std::string& id) {
     int index = get_instance_index(id);
+    ActorInstance* instance = &instances[index];
+    MapTile* tile = MAIN_MAP->get_tile(instance->x, instance->y);
+    for (size_t i = 0; i < tile->actors.size(); ++i) {
+        if (tile->actors[i]->id == id)
+            tile->actors.erase(tile->actors.begin()+i);
+    }
     if (index >= 0)
         instances.erase(instances.begin() + index);
     return true;

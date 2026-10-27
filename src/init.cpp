@@ -26,9 +26,11 @@
 #include "inputs/inputs.hpp"
 #include "agents.hpp"
 #include "mods/mods.hpp"
-#include "utils/logger.hpp"
 
-#include "settings/info.h"
+#include "utils/logger.hpp"
+#include "utils/iff.hpp"
+
+#include "settings/info.hpp"
 #include "settings/locations.hpp"
 #include "settings/debug.hpp"
 #include "settings/main.hpp"
@@ -188,7 +190,8 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
     if (
         DEBUG["test_mod_server"].get<bool>() ||
         DEBUG["test_logger"].get<bool>() ||
-        DEBUG["print_locations"].get<bool>()
+        DEBUG["print_locations"].get<bool>() ||
+        DEBUG["test_iff"].get<bool>()
     )
     {
         LOG(LogLevel::Info, "Running tests..");
@@ -235,6 +238,14 @@ SDL_AppResult init(void** appState, int argc, char** argv) {
                 std::string current_value_str = setting.get<std::filesystem::path>().u8string();
                 LOG(LogLevel::Debug, "%s: \"%s\"", key.c_str(), current_value_str.c_str());
             }
+        }
+
+        if (DEBUG["test_iff"].get<bool>()) {
+            IFF_File file(std::filesystem::path("test.dat"));
+            file.write_char4("FORM");
+            file.move(0);
+            const std::string test_str = file.get_chunk_type();
+            LOG(LogLevel::Debug, "Test string: \"%s\"", test_str.c_str());
         }
 
         LOG(LogLevel::Info, "All good; have fun!");

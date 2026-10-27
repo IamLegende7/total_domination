@@ -1,6 +1,7 @@
 #ifndef ACTORS_HPP
 #define ACTORS_HPP
 
+#include <SDL3/SDL_stdinc.h>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -49,6 +50,7 @@ struct ActorInstance {
     std::string id;
     Actor* parent;
     RenderAgentEntity* entity;
+    Uint8 owner;
     int hp, max_hp;
     int movement_speed;
     int attack_value, defence_value;
@@ -61,11 +63,11 @@ class ActorHandler {
         std::deque<Actor> actors;
         std::deque<ActorInstance> instances;
         SDL_Color player_colour = player_colour;
-        uint8_t player_num = player_num;
+        Uint8 player_num = player_num;
 
         bool execute_actor_function(ActorInstance* instance, const std::string& key);
     public:
-        ActorHandler(RenderAgent* agent, const SDL_Color& player_colour, uint8_t player_num);
+        ActorHandler(RenderAgent* agent, const SDL_Color& player_colour, Uint8 player_num);
         ~ActorHandler();
 
         // Actors
@@ -74,7 +76,7 @@ class ActorHandler {
 
         // ActorInstances
         int get_instance_count(const std::string& id);
-        ActorInstance* spawn_actor(const std::string& id, const int& col, const int& row);
+        ActorInstance* spawn_actor(const std::string& id, const int& col, const int& row, const bool ignore_occupied=false);
         bool delete_instance(const std::string& id);
         ActorInstance* get_instance(const std::string& id, bool suppress_logs=false);
         int get_instance_index(const std::string& id, bool suppress_logs=true);

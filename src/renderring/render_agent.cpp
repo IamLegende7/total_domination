@@ -89,8 +89,19 @@ bool RenderAgent::render(const int zoom, const int x_offset, const int y_offset,
         const int screen_width = (DEBUG["show_tile_hiding"].get<bool>() ? SCREEN_WIDTH-200  : SCREEN_WIDTH);
         const int screen_height = (DEBUG["show_tile_hiding"].get<bool>() ? SCREEN_HEIGHT-200 : SCREEN_HEIGHT);
 
-        const float inverse_zoom = 1.0f / zoom;
-        const float inverse_resolution = 1.0f / resolution;
+        static int old_zoom = zoom;
+        static int old_resolution = resolution;
+        static float inverse_zoom = 1.0f / zoom;
+        static float inverse_resolution = 1.0f / resolution;
+        if (old_zoom != zoom) {
+            old_zoom = zoom;
+            inverse_zoom = 1.0f / zoom;
+        }
+        if (old_resolution != resolution) {
+            old_resolution = resolution;
+            inverse_resolution = 1.0f / resolution;
+        }
+
         const int query_x = (int)std::floor(x_offset + screen_x * inverse_zoom * resolution) - 1;
         const int query_y = (int)std::floor(y_offset + screen_y * inverse_zoom * resolution) - 1;
         const int query_w = (int)std::ceil(screen_width * inverse_zoom * resolution) + 2;
@@ -679,7 +690,7 @@ RenderAgentEntity* RenderAgent::add_entity(const std::string& sprite_id, const u
     agent_entitys.push_back(entity);
     bool status = agent_quadtree.insert(&agent_entitys.back(), allow_subdivision);
     if (!status) {
-        LOG(LogLevel::Warning, "Could not add new entity at X: %d, Y: %d, layer: %d, rotation: %d: quadtree did not accept entry", x, y, entity.layer, rotation);
+        LOG(LogLevel::Warning, "Could not add new entity at X: %d, Y: %d; w: %d, h: %d, layer: %d, rotation: %d: quadtree did not accept entry", x, y, entity.sprite->animations[0].texture_rects[0].w, entity.sprite->animations[0].texture_rects[0].h, entity.layer, rotation);
         return nullptr;
     }
     return &agent_entitys.back();

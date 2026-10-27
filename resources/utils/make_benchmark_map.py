@@ -1,6 +1,7 @@
 import json
 import sys
 import math
+from datetime import date
 
 CHUNK_SIZE = 16
 
@@ -25,8 +26,15 @@ else:
 
 contents = {
     "name": f"Map loading benchmark ({size}x{size} Tiles)",
-    "description": "A super big map for benchmarking map loading. Made with resources/utils/make_benchmark_map.py",
+    "description": "A super big map for benchmarking map loading.",
     "declarations": {},
+    "author": sys.argv[0],
+    "creation_date": str(date.today().isoformat()),
+    "version": 0,
+    "actors": [
+        {"id": "td:palace_placeholder", "owner": 0, "x": 0, "y": 0},
+        {"id": "td:palace_placeholder", "owner": 1, "x": 1, "y": 0}
+    ],
     "data": []
 }
 

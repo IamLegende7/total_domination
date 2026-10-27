@@ -126,9 +126,10 @@ SDL_AppResult SDL_AppIterate(void* appState) {
                 Uint64 preformance_frequency = SDL_GetPerformanceFrequency();
 
                 MAIN_MAP = new Map(MAIN_RENDER_AGENT, DEBUG["force_load_map"].get<std::filesystem::path>());
+                MAIN_MAP->load_actors();
 
                 // Load Initial chunks
-                std::vector<std::tuple<int, int>> initial_chunks;
+                std::vector<std::tuple<Uint32, Uint32>> initial_chunks;
                 if (SETTINGS["loading_type"].get<int>() == 0) {
                     for (int y = 0; y < int(MAIN_MAP->rows); ++y) {
                         for (int x = 0; x < int(MAIN_MAP->cols); ++x) {
@@ -174,7 +175,7 @@ SDL_AppResult SDL_AppIterate(void* appState) {
                         animation += 2;
                     selected_tile_indicator = ACTORS_RENDER_AGENT->add_entity("td:selected_tile", animation, selected_tile_x, selected_tile_y, 0, 0, true, true);
                     if (!selected_tile_indicator)
-                        LOG(LogLevel::Error, "Could not add tile \"selected_tile_indicator\"");
+                        LOG(LogLevel::Error, "Could not add entity \"selected_tile_indicator\"");
 
                     if (selected_tile_indicator != nullptr) {
                         SDL_Rect& selected_tile_rect = selected_tile_indicator->sprite->animations[0].texture_rects[0];
@@ -190,6 +191,9 @@ SDL_AppResult SDL_AppIterate(void* appState) {
                 ACTORS_RENDER_AGENT->set_dirty();
                 UI_RENDER_AGENT->set_dirty();
                 MODE = 1;
+
+                if (!std::filesystem::exists(replace_locations(DEBUG["force_load_map"].get<std::filesystem::path>().parent_path() / std::filesystem::path(DEBUG["force_load_map"].get<std::filesystem::path>().stem().u8string()+".iff"))))
+                    MAIN_MAP->save(DEBUG["force_load_map"].get<std::filesystem::path>().parent_path() / std::filesystem::path(DEBUG["force_load_map"].get<std::filesystem::path>().stem().u8string()+".iff"));
             }
         } else if (MODE == 1) {
             if (ROUND != last_round) {

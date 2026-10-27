@@ -194,7 +194,7 @@ if [ "$do_clean_build" = true ]; then
         rm -rf resources/python
     fi
 fi
-if [ -d "resources/python" ]; then
+if [ ! -d "resources/python" ]; then
     echo "Building python.."
     PYTHON_VERSION="3.14.7"
     mkdir -p resources/python

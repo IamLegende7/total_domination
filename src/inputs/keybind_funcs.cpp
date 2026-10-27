@@ -22,11 +22,13 @@ bool update_selected_tile() {
         LOG(LogLevel::Warning, "Tile (%d, %d) returned nullptr", TILE_SELECTION_X, TILE_SELECTION_Y);
         return false;
     }
-    const int selected_tile_x = 16*(selected_tile->x-selected_tile->y);
-    const int selected_tile_y = 11*(selected_tile->x+selected_tile->y)-(16*(selected_tile->height-1));
+    const int selected_tile_x = 16*(TILE_SELECTION_X-TILE_SELECTION_Y);
+    const int selected_tile_y = 11*(TILE_SELECTION_X+TILE_SELECTION_Y)-(16*(selected_tile->height-1));
+    //LOG(LogLevel::Debug, "selected_tile->x: %d, selected_tile->y: %d", selected_tile->x, selected_tile->y); // Why ist selected_tile->x/y wrong??
+    //LOG(LogLevel::Debug, "selected_tile_x: %d, selected_tile_y: %d", selected_tile_x, selected_tile_y);
     if (selected_tile_indicator == nullptr)
         return false;
-    if ((selected_tile_indicator->x != selected_tile_x) || (selected_tile_indicator->x != selected_tile_x)) {
+    if ((selected_tile_indicator->x != selected_tile_x) || (selected_tile_indicator->y != selected_tile_y)) {
         const auto [surrounding_height_top, surrounding_height_bottom, surrounding_height_left, surrounding_height_right] = MAIN_MAP->get_surrounding(TILE_SELECTION_X, TILE_SELECTION_Y);
         selected_tile_indicator->x = selected_tile_x;
         selected_tile_indicator->y = selected_tile_y;

@@ -29,6 +29,7 @@ inline void init_debug_settings(const std::filesystem::path& config_file) {
     DEBUG["test_logger"] =              Setting(load_setting<bool>(config_file.u8string(), "Tests", "test_logger", false));
     DEBUG["print_locations"] =          Setting(load_setting<bool>(config_file.u8string(), "Tests", "print_locations", false));
     DEBUG["test_mod_server"] =          Setting(load_setting<bool>(config_file.u8string(), "Tests", "test_mod_server", false));
+    DEBUG["test_iff"] =                 Setting(load_setting<bool>(config_file.u8string(), "Tests", "test_iff", false));
 };
 
 #endif

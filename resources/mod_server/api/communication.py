@@ -49,3 +49,7 @@ def request_function(function: str, args: list) -> dict:
                     "return": {}
                 }
             i += 1
+    return {
+        "status": -400,
+        "return": {}
+    }

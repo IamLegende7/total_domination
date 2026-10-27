@@ -1,8 +1,12 @@
 {
     "name": "Blank",
     "description": "A Blank (empty) map for testing",
-    "spawn_points": [
-        [16, 0]
+    "author": "Legende_7",
+    "creation_date": "2026-10-21",
+    "version": 2,
+    "actors": [
+        {"id": "td:palace_placeholder", "owner": 0, "x": 7, "y": 30},
+        {"id": "td:palace_placeholder", "owner": 1, "x": 7, "y": 0}
     ],
     "data": [
         [
@@ -16,7 +20,7 @@
                     {"base": "td:dirt", "top": "td:top_grass", "height": 3},
                     {"base": "td:dirt", "top": "td:top_grass", "height": 3},
                     {"base": "td:dirt", "top": "td:top_grass", "height": 3},
-                    {"base": "td:dirt", "top": "td:top_grass", "height": 3, "actors": [{"id": "td:palace_placeholder", "owner": 1}]},
+                    {"base": "td:dirt", "top": "td:top_grass", "height": 3},
                     {"base": "td:dirt", "top": "td:top_grass", "height": 3},
                     {"base": "td:dirt", "top": "td:top_grass", "height": 3},
                     {"base": "td:dirt", "top": "td:top_grass", "height": 3},
@@ -560,7 +564,7 @@
                     {"base": "td:dirt", "top": "td:top_grass", "height": 3},
                     {"base": "td:dirt", "top": "td:top_grass", "height": 3},
                     {"base": "td:dirt", "top": "td:top_grass", "height": 3},
-                    {"base": "td:dirt", "top": "td:top_grass", "height": 3, "actors": [{"id": "td:palace_placeholder", "owner": 0}]},
+                    {"base": "td:dirt", "top": "td:top_grass", "height": 3},
                     {"base": "td:dirt", "top": "td:top_grass", "height": 3},
                     {"base": "td:dirt", "top": "td:top_grass", "height": 3},
                     {"base": "td:dirt", "top": "td:top_grass", "height": 3},
